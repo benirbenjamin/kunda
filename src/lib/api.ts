@@ -27,12 +27,27 @@ api.interceptors.request.use(
 export function getErrorMessage(error: any): string {
   if (!error) return 'An unexpected error occurred.';
 
-  // If response contains structured JSON error from Kunda API
-  if (error.response?.data?.error) {
-    return error.response.data.error;
-  }
-  if (error.response?.data?.message) {
-    return error.response.data.message;
+  // If response contains data
+  const errData = error.response?.data;
+  if (errData) {
+    if (typeof errData.error === 'string') {
+      return errData.error;
+    }
+    if (typeof errData.error === 'object' && errData.error !== null) {
+      if (typeof errData.error.message === 'string') {
+        return errData.error.message;
+      }
+      if (typeof errData.error.code === 'string') {
+        return `Error: ${errData.error.code}`;
+      }
+      return JSON.stringify(errData.error);
+    }
+    if (typeof errData.message === 'string') {
+      return errData.message;
+    }
+    if (typeof errData === 'string') {
+      return errData;
+    }
   }
 
   // If 401 Unauthorized
@@ -42,7 +57,7 @@ export function getErrorMessage(error: any): string {
 
   // If 403 Forbidden
   if (error.response?.status === 403) {
-    return error.response?.data?.error || 'Access denied. Account is restricted.';
+    return 'Access denied. Account is restricted.';
   }
 
   // If 404 Not Found
@@ -50,8 +65,13 @@ export function getErrorMessage(error: any): string {
     return 'The requested resource or endpoint was not found.';
   }
 
+  // If 500 Internal Server Error
+  if (error.response?.status >= 500) {
+    return 'Server error. Please try again in a few moments.';
+  }
+
   // If standard Axios error message
-  if (error.message) {
+  if (typeof error.message === 'string') {
     if (error.message.includes('Network Error')) {
       return 'Unable to reach the server. Please check your internet connection.';
     }
