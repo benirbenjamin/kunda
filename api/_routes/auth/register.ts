@@ -1,0 +1,176 @@
+// =====================================================================
+// POST /api/auth/register - Three-step wizard submission & adult check
+// =====================================================================
+import crypto from 'crypto';
+import { isAdult, hashPassword, generateToken } from '../../_lib/auth';
+import { memoryStore, query } from '../../_lib/db';
+import { BUSINESS_CONFIG } from '../../_lib/config';
+import { sendVerificationEmail } from '../../_lib/email';
+
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
+  }
+
+  try {
+    const {
+      email,
+      password,
+      dob,
+      displayName,
+      gender,
+      interestedIn,
+      country,
+      city,
+      phone,
+      phoneCode,
+      preferredLanguage,
+      relationshipIntention,
+      bio,
+      height,
+      languages,
+      interests,
+      photos,
+      minAgePref,
+      maxAgePref,
+      datingScope,
+      appearanceSkinTone,
+    } = req.body;
+
+    // 1. Mandatory server-side fields check
+    if (!email || !password || !dob || !displayName || !gender || !interestedIn) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required registration fields (email, password, dob, displayName, gender, interestedIn).',
+      });
+    }
+
+    // 2. Strict Server-Side 18+ Verification
+    if (!isAdult(dob)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Underage registration rejected. Kunda Space is strictly for adults aged 18 and older.',
+      });
+    }
+
+    // 3. Email uniqueness check
+    const existing = memoryStore.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        error: 'An account with this email address already exists. Please sign in.',
+      });
+    }
+
+    // 4. Hash password
+    const passwordHash = await hashPassword(password);
+    const userId = crypto.randomUUID();
+    const profileId = crypto.randomUUID();
+
+    // Generate 6-digit verification code & token
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    const newUser = {
+      id: userId,
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      role: 'user',
+      dob,
+      phone: phone || '',
+      phoneCode: phoneCode || '+250',
+      preferredLanguage: preferredLanguage || 'en',
+      emailVerified: false,
+      verificationCode,
+      verificationToken,
+      verificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      phoneVerified: false,
+      isSuspended: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    const newProfile = {
+      id: profileId,
+      userId,
+      displayName: displayName.trim(),
+      gender,
+      interestedIn,
+      country: country || 'Rwanda',
+      city: city || 'Kigali',
+      bio: bio || '',
+      height: height ? parseInt(height, 10) : null,
+      languages: Array.isArray(languages) ? languages : ['English', 'Kinyarwanda'],
+      relationshipIntention: relationshipIntention || 'serious_relationship',
+      interests: Array.isArray(interests) ? interests : [],
+      photos: Array.isArray(photos) && photos.length > 0
+        ? photos
+        : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'],
+      contactSharingConsent: true,
+      profileCompleted: true,
+      verifiedBadge: false,
+      minAgePref: minAgePref || 20,
+      maxAgePref: maxAgePref || 50,
+      datingScope: datingScope || 'local',
+      appearanceSkinTone: appearanceSkinTone || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Store in memoryStore
+    memoryStore.users.push(newUser);
+    memoryStore.profiles.push(newProfile);
+    memoryStore.wallets.set(userId, { balanceMinor: 0, currency: 'RWF' });
+    memoryStore.allowances.set(userId, {
+      initialRemaining: BUSINESS_CONFIG.FREE_INITIAL_MESSAGES,
+      distinctRecipients: [],
+      repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED,
+    });
+
+    // Send verification email via configured provider (Resend or SMTP)
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
+    try {
+      await sendVerificationEmail(
+        newUser.email,
+        newProfile.displayName,
+        verificationCode,
+        verificationToken,
+        appUrl
+      );
+    } catch (emailErr) {
+      console.warn('Failed to send verification email:', emailErr);
+    }
+
+    // Also attempt write to PostgreSQL if connected
+    await query(
+      `INSERT INTO users (id, email, password_hash, role, dob, phone, phone_code, preferred_language, email_verified)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
+       ON CONFLICT (email) DO NOTHING`,
+      [userId, newUser.email, passwordHash, 'user', dob, newUser.phone, newUser.phoneCode, newUser.preferredLanguage]
+    );
+
+    // Generate JWT auth session
+    const token = generateToken({
+      userId,
+      email: newUser.email,
+      role: 'user',
+      preferredLanguage: newUser.preferredLanguage,
+    });
+
+    return res.status(201).json({
+      success: true,
+      token,
+      requiresVerification: true,
+      verificationCode, // Returned for instant demo testing
+      user: {
+        id: userId,
+        email: newUser.email,
+        role: newUser.role,
+        preferredLanguage: newUser.preferredLanguage,
+        emailVerified: false,
+      },
+      profile: newProfile,
+    });
+  } catch (error: any) {
+    console.error('Registration API error:', error);
+    return res.status(500).json({ success: false, error: 'Registration failed. Please try again.' });
+  }
+}
