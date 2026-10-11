@@ -170,10 +170,10 @@ export const Messages: React.FC = () => {
 
       if (data.success && data.phone) {
         setUnlockedPhone(data.phone);
-        setIsUnlockModalOpen(false);
+        setUnlockModalOpen(false);
         refreshBalance();
       } else if (data.error === 'INSUFFICIENT_FUNDS') {
-        setIsUnlockModalOpen(false);
+        setUnlockModalOpen(false);
         setIsDepositModalOpen(true);
       } else {
         alert(data.message || data.error);
@@ -181,7 +181,7 @@ export const Messages: React.FC = () => {
     } catch (err: any) {
       const errData = err.response?.data;
       if (errData?.error === 'INSUFFICIENT_FUNDS') {
-        setIsUnlockModalOpen(false);
+        setUnlockModalOpen(false);
         setIsDepositModalOpen(true);
       } else {
         alert(getErrorMessage(err));
