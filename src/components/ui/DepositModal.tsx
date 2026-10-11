@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { useWallet } from '../../contexts/WalletContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CreditCard, Smartphone, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export const DepositModal: React.FC = () => {
   const { isDepositModalOpen, setIsDepositModalOpen, depositFunds, refreshBalance } = useWallet();
@@ -25,14 +26,7 @@ export const DepositModal: React.FC = () => {
         try {
           const urlParams = new URLSearchParams(result.paymentUrl.split('?')[1]);
           const txRef = urlParams.get('tx_ref');
-          await fetch('/api/payments/verify', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('kunda_token')}`,
-            },
-            body: JSON.stringify({ txRef, amount }),
-          });
+          await api.post('/payments/verify', { txRef, amount });
           await refreshBalance();
           setTestComplete(true);
         } catch (err) {

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { api } from '../lib/api';
 
 export interface NotificationItem {
   id: string;
@@ -91,14 +92,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const refreshNotifications = async () => {
     if (!token) return;
     try {
-      const res = await fetch('/api/notifications', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (data.success && data.notifications) {
-        setNotifications(data.notifications);
+      const res = await api.get('/notifications');
+      if (res.data.success && res.data.notifications) {
+        setNotifications(res.data.notifications);
       }
     } catch (err) {
       console.error('Notification fetch error:', err);
@@ -116,14 +112,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const markAsRead = async (id: string) => {
     if (!token) return;
     try {
-      await fetch('/api/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ notificationId: id }),
-      });
+      await api.post('/notifications', { notificationId: id });
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     } catch (err) {
       console.error('Mark notification read error:', err);
@@ -133,14 +122,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const markAllAsRead = async () => {
     if (!token) return;
     try {
-      await fetch('/api/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ markAll: true }),
-      });
+      await api.post('/notifications', { markAll: true });
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch (err) {
       console.error('Mark all notifications read error:', err);

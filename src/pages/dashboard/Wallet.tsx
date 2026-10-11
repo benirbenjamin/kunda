@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { DepositModal } from '../../components/ui/DepositModal';
 import { Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, ShieldCheck, History } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export const Wallet: React.FC = () => {
   const { token } = useAuth();
@@ -19,12 +20,9 @@ export const Wallet: React.FC = () => {
     if (!token) return;
     try {
       setLoading(true);
-      const res = await fetch('/api/wallet/transactions', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && data.transactions) {
-        setTransactions(data.transactions);
+      const res = await api.get('/wallet/transactions');
+      if (res.data.success && res.data.transactions) {
+        setTransactions(res.data.transactions);
       }
     } catch (err) {
       console.error('Fetch ledger error:', err);

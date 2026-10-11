@@ -6,6 +6,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { MailCheck, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 
+import { api, getErrorMessage } from '../../lib/api';
+
 export const VerifyEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
   const urlToken = searchParams.get('token');
@@ -33,17 +35,13 @@ export const VerifyEmail: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          code: code.trim(),
-          token: tokenOverride || urlToken,
-        }),
+      const res = await api.post('/auth/verify-email', {
+        email: email.trim(),
+        code: code.trim(),
+        token: tokenOverride || urlToken,
       });
 
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setSuccess(true);
         await refreshSession();
@@ -52,7 +50,7 @@ export const VerifyEmail: React.FC = () => {
         setError(data.error || 'Verification failed. Please check the code.');
       }
     } catch (err: any) {
-      setError(err.message || 'Verification network error');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

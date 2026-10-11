@@ -23,6 +23,8 @@ import {
   BookOpen,
 } from 'lucide-react';
 
+import { api, getErrorMessage } from '../../lib/api';
+
 export const RegisterWizard: React.FC = () => {
   const { login } = useAuth();
   const { t, language } = useLanguage();
@@ -38,12 +40,11 @@ export const RegisterWizard: React.FC = () => {
 
   // Fetch registration tutorials posted by admin
   React.useEffect(() => {
-    fetch('/api/tutorials')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success && d.tutorials) {
-          setTutorials(d.tutorials);
-          if (d.tutorials.length > 0) setSelectedTut(d.tutorials[0]);
+    api.get('/tutorials')
+      .then((res) => {
+        if (res.data?.success && res.data?.tutorials) {
+          setTutorials(res.data.tutorials);
+          if (res.data.tutorials.length > 0) setSelectedTut(res.data.tutorials[0]);
         }
       })
       .catch((err) => console.error('Failed to load tutorials:', err));
@@ -59,22 +60,14 @@ export const RegisterWizard: React.FC = () => {
     reader.onload = async () => {
       const base64 = reader.result as string;
       try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('kunda_token') || ''}`,
-          },
-          body: JSON.stringify({
-            fileBase64: base64,
-            filename: file.name,
-            mimeType: file.type,
-            isRegistration: true,
-          }),
+        const res = await api.post('/upload', {
+          fileBase64: base64,
+          filename: file.name,
+          mimeType: file.type,
+          isRegistration: true,
         });
-        const data = await res.json();
-        if (data.success && data.url) {
-          setFormData((prev) => ({ ...prev, primaryPhoto: data.url }));
+        if (res.data?.success && res.data?.url) {
+          setFormData((prev) => ({ ...prev, primaryPhoto: res.data.url }));
         }
       } catch (uploadErr) {
         console.error('Drive upload failed, using local preview:', uploadErr);
@@ -229,16 +222,12 @@ export const RegisterWizard: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          photos: [formData.primaryPhoto, ...formData.galleryPhotos],
-        }),
+      const res = await api.post('/auth/register', {
+        ...formData,
+        photos: [formData.primaryPhoto, ...formData.galleryPhotos],
       });
 
-      const data = await res.json();
+      const data = res.data;
       if (data.success && data.token) {
         login(data.token, data.user, data.profile);
         navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
@@ -246,7 +235,7 @@ export const RegisterWizard: React.FC = () => {
         setError(data.error || 'Registration failed. Please check your information.');
       }
     } catch (err: any) {
-      setError(err.message || 'Network error occurred');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

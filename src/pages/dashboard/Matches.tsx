@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '../../components/ui/Button';
 import { Heart, MessageCircle, MapPin, Sparkles } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export const Matches: React.FC = () => {
   const { token } = useAuth();
@@ -15,10 +16,8 @@ export const Matches: React.FC = () => {
     const fetchMatches = async () => {
       if (!token) return;
       try {
-        const res = await fetch('/api/members/matches', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
+        const res = await api.get('/members/matches');
+        const data = res.data;
         if (data.success && data.matches) {
           setMatches(data.matches);
         }

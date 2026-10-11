@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { DepositModal } from '../../components/ui/DepositModal';
 import { Zap, Check, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
+import { api, getErrorMessage } from '../../lib/api';
 
 export const Subscription: React.FC = () => {
   const { token, refreshSession } = useAuth();
@@ -21,19 +22,15 @@ export const Subscription: React.FC = () => {
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/subscriptions/plans');
-      const data = await res.json();
-      if (data.success && data.plans) {
-        setPlans(data.plans);
+      const res = await api.get('/subscriptions/plans');
+      if (res.data.success && res.data.plans) {
+        setPlans(res.data.plans);
       }
 
       // Check current session
-      const meRes = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const meData = await meRes.json();
-      if (meData.success && meData.activeSubscription) {
-        setActiveSub(meData.activeSubscription);
+      const meRes = await api.get('/auth/me');
+      if (meRes.data.success && meRes.data.activeSubscription) {
+        setActiveSub(meRes.data.activeSubscription);
       }
     } catch (err) {
       console.error('Fetch plans error:', err);
@@ -52,15 +49,8 @@ export const Subscription: React.FC = () => {
     setMessage(null);
 
     try {
-      const res = await fetch('/api/subscriptions/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ planCode }),
-      });
-      const data = await res.json();
+      const res = await api.post('/subscriptions/subscribe', { planCode });
+      const data = res.data;
 
       if (data.success && data.subscription) {
         setActiveSub(data.subscription);
@@ -73,7 +63,11 @@ export const Subscription: React.FC = () => {
         alert(data.message || data.error);
       }
     } catch (err: any) {
-      alert(err.message || 'Subscription failed');
+      if (err.response?.data?.error === 'INSUFFICIENT_FUNDS') {
+        setIsDepositModalOpen(true);
+      } else {
+        alert(getErrorMessage(err) || 'Subscription failed');
+      }
     } finally {
       setSubmitting(false);
     }

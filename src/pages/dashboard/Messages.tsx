@@ -18,6 +18,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
+import { api, getErrorMessage } from '../../lib/api';
 
 export const Messages: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -61,10 +62,8 @@ export const Messages: React.FC = () => {
   const fetchConversations = async () => {
     if (!token) return;
     try {
-      const res = await fetch('/api/messages/conversations', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const res = await api.get('/messages/conversations');
+      const data = res.data;
       if (data.success && data.conversations) {
         setConversations(data.conversations);
         if (!selectedPartnerId && data.conversations.length > 0) {
@@ -85,10 +84,8 @@ export const Messages: React.FC = () => {
     if (!token || !partnerId) return;
     try {
       setLoadingMessages(true);
-      const res = await fetch(`/api/messages/send?partnerId=${partnerId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const res = await api.get(`/messages/send?partnerId=${partnerId}`);
+      const data = res.data;
       if (data.success) {
         setMessages(data.messages || []);
         setAllowanceState({
@@ -129,19 +126,12 @@ export const Messages: React.FC = () => {
     setModerationWarning(null);
 
     try {
-      const res = await fetch('/api/messages/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          recipientId: selectedPartnerId,
-          content: messageInput.trim(),
-        }),
+      const res = await api.post('/messages/send', {
+        recipientId: selectedPartnerId,
+        content: messageInput.trim(),
       });
 
-      const data = await res.json();
+      const data = res.data;
 
       if (data.success) {
         setMessageInput('');
@@ -149,19 +139,20 @@ export const Messages: React.FC = () => {
         playNotificationSound();
         refreshBalance();
         fetchConversations();
-      } else if (data.error === 'CONTENT_MODERATION_VIOLATION') {
-        setModerationWarning({
-          reason: data.reason,
-          safeSuggestion: data.safeSuggestion,
-          matchedPattern: data.matchedPattern,
-        });
-      } else if (data.error === 'INSUFFICIENT_FUNDS') {
-        setIsDepositModalOpen(true);
-      } else {
-        alert(data.error || 'Failed to send message');
       }
     } catch (err: any) {
-      console.error('Send message error:', err);
+      const errData = err.response?.data;
+      if (errData?.error === 'CONTENT_MODERATION_VIOLATION') {
+        setModerationWarning({
+          reason: errData.reason,
+          safeSuggestion: errData.safeSuggestion,
+          matchedPattern: errData.matchedPattern,
+        });
+      } else if (errData?.error === 'INSUFFICIENT_FUNDS') {
+        setIsDepositModalOpen(true);
+      } else {
+        alert(getErrorMessage(err));
+      }
     } finally {
       setSending(false);
     }
@@ -172,28 +163,29 @@ export const Messages: React.FC = () => {
     setUnlockLoading(true);
 
     try {
-      const res = await fetch('/api/messages/unlock-contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ targetUserId: selectedPartnerId }),
+      const res = await api.post('/messages/unlock-contact', {
+        targetUserId: selectedPartnerId,
       });
-      const data = await res.json();
+      const data = res.data;
 
       if (data.success && data.phone) {
         setUnlockedPhone(data.phone);
-        setUnlockModalOpen(false);
+        setIsUnlockModalOpen(false);
         refreshBalance();
       } else if (data.error === 'INSUFFICIENT_FUNDS') {
-        setUnlockModalOpen(false);
+        setIsUnlockModalOpen(false);
         setIsDepositModalOpen(true);
       } else {
         alert(data.message || data.error);
       }
     } catch (err: any) {
-      alert(err.message || 'Unlock failed');
+      const errData = err.response?.data;
+      if (errData?.error === 'INSUFFICIENT_FUNDS') {
+        setIsUnlockModalOpen(false);
+        setIsDepositModalOpen(true);
+      } else {
+        alert(getErrorMessage(err));
+      }
     } finally {
       setUnlockLoading(false);
     }

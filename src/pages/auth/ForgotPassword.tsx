@@ -5,6 +5,8 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { KeyRound, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 
+import { api, getErrorMessage } from '../../lib/api';
+
 export const ForgotPassword: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -20,19 +22,15 @@ export const ForgotPassword: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-      const data = await res.json();
+      const res = await api.post('/auth/forgot-password', { email: email.trim() });
+      const data = res.data;
       if (data.success) {
         setSubmitted(true);
       } else {
         setError(data.error || 'Failed to dispatch password recovery email');
       }
     } catch (err: any) {
-      setError(err.message || 'Network error');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

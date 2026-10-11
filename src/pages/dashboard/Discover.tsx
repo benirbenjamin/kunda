@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { api } from '../../lib/api';
 
 export const Discover: React.FC = () => {
   const { token } = useAuth();
@@ -35,11 +36,9 @@ export const Discover: React.FC = () => {
     if (!token) return;
     try {
       setLoading(true);
-      const url = filterCity ? `/api/members/discover?city=${encodeURIComponent(filterCity)}` : '/api/members/discover';
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const url = filterCity ? `/members/discover?city=${encodeURIComponent(filterCity)}` : '/members/discover';
+      const res = await api.get(url);
+      const data = res.data;
       if (data.success && data.profiles) {
         setProfiles(data.profiles);
         setCurrentIndex(0);
@@ -60,15 +59,11 @@ export const Discover: React.FC = () => {
     if (!candidate || !token) return;
 
     try {
-      const res = await fetch('/api/members/interaction', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ targetUserId: candidate.userId, action }),
+      const res = await api.post('/members/interaction', {
+        targetUserId: candidate.userId,
+        action,
       });
-      const data = await res.json();
+      const data = res.data;
 
       if (data.isMatch) {
         setMatchedProfile(candidate);

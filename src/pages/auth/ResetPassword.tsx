@@ -4,6 +4,8 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 
+import { api, getErrorMessage } from '../../lib/api';
+
 export const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
   const urlToken = searchParams.get('token');
@@ -36,18 +38,14 @@ export const ResetPassword: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          code: code.trim(),
-          token: urlToken,
-          newPassword,
-        }),
+      const res = await api.post('/auth/reset-password', {
+        email: email.trim(),
+        code: code.trim(),
+        token: urlToken,
+        newPassword,
       });
 
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setSuccess(true);
         setTimeout(() => navigate('/auth/login'), 2500);
@@ -55,7 +53,7 @@ export const ResetPassword: React.FC = () => {
         setError(data.error || 'Failed to reset password. Please check the code.');
       }
     } catch (err: any) {
-      setError(err.message || 'Network error');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

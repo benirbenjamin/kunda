@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Camera, Check, ShieldCheck, User } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export const Profile: React.FC = () => {
   const { profile, updateProfile, token } = useAuth();
@@ -34,19 +35,12 @@ export const Profile: React.FC = () => {
     reader.onload = async () => {
       const base64 = reader.result as string;
       try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            fileBase64: base64,
-            filename: file.name,
-            mimeType: file.type,
-          }),
+        const res = await api.post('/upload', {
+          fileBase64: base64,
+          filename: file.name,
+          mimeType: file.type,
         });
-        const data = await res.json();
+        const data = res.data;
         if (data.success && data.url) {
           setPhotos((prev) => [data.url, ...prev.slice(1)]);
         } else {

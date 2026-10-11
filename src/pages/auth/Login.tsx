@@ -6,6 +6,8 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Heart, Lock, AlertCircle } from 'lucide-react';
 
+import { api, getErrorMessage } from '../../lib/api';
+
 export const Login: React.FC = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
@@ -22,13 +24,12 @@ export const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const res = await api.post('/auth/login', {
+        email: email.trim(),
+        password,
       });
-      const data = await res.json();
 
+      const data = res.data;
       if (data.success && data.token) {
         login(data.token, data.user, data.profile);
         navigate('/dashboard/discover');
@@ -36,7 +37,7 @@ export const Login: React.FC = () => {
         setError(data.error || t('auth.loginError'));
       }
     } catch (err: any) {
-      setError(err.message || 'Network error occurred during login');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

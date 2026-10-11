@@ -23,6 +23,7 @@ import {
   HardDrive,
   Eye,
 } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export const AdminDashboard: React.FC = () => {
   const { token, isAdmin } = useAuth();
@@ -64,34 +65,28 @@ export const AdminDashboard: React.FC = () => {
       setLoading(true);
 
       // Metrics
-      const mRes = await fetch('/api/admin/metrics', { headers: { Authorization: `Bearer ${token}` } });
-      const mData = await mRes.json();
-      if (mData.success) setMetrics(mData.metrics);
+      const mRes = await api.get('/admin/metrics');
+      if (mRes.data.success) setMetrics(mRes.data.metrics);
 
       // Users
-      const uRes = await fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } });
-      const uData = await uRes.json();
-      if (uData.success) setUsers(uData.users);
+      const uRes = await api.get('/admin/users');
+      if (uRes.data.success) setUsers(uRes.data.users);
 
       // Settings
-      const sRes = await fetch('/api/admin/settings', { headers: { Authorization: `Bearer ${token}` } });
-      const sData = await sRes.json();
-      if (sData.success) setSettings(sData.settings);
+      const sRes = await api.get('/admin/settings');
+      if (sRes.data.success) setSettings(sRes.data.settings);
 
       // Moderation
-      const modRes = await fetch('/api/admin/moderation', { headers: { Authorization: `Bearer ${token}` } });
-      const modData = await modRes.json();
-      if (modData.success) setModerationEvents(modData.moderationEvents);
+      const modRes = await api.get('/admin/moderation');
+      if (modRes.data.success) setModerationEvents(modRes.data.moderationEvents);
 
       // Ledger
-      const lRes = await fetch('/api/admin/ledger', { headers: { Authorization: `Bearer ${token}` } });
-      const lData = await lRes.json();
-      if (lData.success) setTransactions(lData.transactions);
+      const lRes = await api.get('/admin/ledger');
+      if (lRes.data.success) setTransactions(lRes.data.transactions);
 
       // Tutorials
-      const tutRes = await fetch('/api/tutorials?all=true');
-      const tutData = await tutRes.json();
-      if (tutData.success) setTutorials(tutData.tutorials);
+      const tutRes = await api.get('/tutorials?all=true');
+      if (tutRes.data.success) setTutorials(tutRes.data.tutorials);
     } catch (err) {
       console.error('Admin fetch error:', err);
     } finally {
@@ -106,20 +101,12 @@ export const AdminDashboard: React.FC = () => {
   // Action handlers
   const handleToggleSuspend = async (targetUserId: string, isSuspended: boolean) => {
     const action = isSuspended ? 'reactivate' : 'suspend';
-    await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ targetUserId, action }),
-    });
+    await api.post('/admin/users', { targetUserId, action });
     fetchAdminData();
   };
 
   const handleToggleVerification = async (targetUserId: string) => {
-    await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ targetUserId, action: 'toggle_verification' }),
-    });
+    await api.post('/admin/users', { targetUserId, action: 'toggle_verification' });
     fetchAdminData();
   };
 
@@ -127,43 +114,27 @@ export const AdminDashboard: React.FC = () => {
     if (!confirm(`Are you sure you want to permanently delete user "${name}"? This will delete all their profile, photos, matches, and transactions.`)) {
       return;
     }
-    await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ targetUserId, action: 'delete' }),
-    });
+    await api.post('/admin/users', { targetUserId, action: 'delete' });
     fetchAdminData();
   };
 
   const handleSetRole = async (targetUserId: string, role: string) => {
-    await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ targetUserId, action: 'set_role', role }),
-    });
+    await api.post('/admin/users', { targetUserId, action: 'set_role', role });
     fetchAdminData();
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/admin/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(settings),
-    });
+    await api.post('/admin/settings', settings);
     alert('Business settings, email credentials, and Google Drive configs updated successfully!');
   };
 
   const handleManualCredit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/admin/ledger', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        targetUserId: adjustUserId,
-        amountMinor: adjustAmount,
-        reason: adjustReason,
-      }),
+    await api.post('/admin/ledger', {
+      targetUserId: adjustUserId,
+      amountMinor: adjustAmount,
+      reason: adjustReason,
     });
     setAdjustModalOpen(false);
     fetchAdminData();
@@ -171,13 +142,9 @@ export const AdminDashboard: React.FC = () => {
 
   const handleCreateTutorial = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/tutorials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        action: 'create',
-        ...tutForm,
-      }),
+    await api.post('/tutorials', {
+      action: 'create',
+      ...tutForm,
     });
     setTutModalOpen(false);
     fetchAdminData();
@@ -185,20 +152,12 @@ export const AdminDashboard: React.FC = () => {
 
   const handleDeleteTutorial = async (tutorialId: string) => {
     if (!confirm('Are you sure you want to delete this tutorial guide?')) return;
-    await fetch('/api/tutorials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action: 'delete', tutorialId }),
-    });
+    await api.post('/tutorials', { action: 'delete', tutorialId });
     fetchAdminData();
   };
 
   const handleToggleTutorial = async (tutorialId: string) => {
-    await fetch('/api/tutorials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action: 'toggle_active', tutorialId }),
-    });
+    await api.post('/tutorials', { action: 'toggle_active', tutorialId });
     fetchAdminData();
   };
 

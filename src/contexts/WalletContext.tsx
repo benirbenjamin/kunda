@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { api, getErrorMessage } from '../lib/api';
 
 interface WalletContextType {
   balance: number;
@@ -28,17 +29,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!token) return;
     try {
       setLoading(true);
-      const res = await fetch('/api/wallet/balance', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBalance(data.balance);
-        setCurrency(data.currency);
-        setTotalDeposits(data.totalDeposits || 0);
-        setTotalSpent(data.totalSpent || 0);
+      const res = await api.get('/wallet/balance');
+      if (res.data.success) {
+        setBalance(res.data.balance);
+        setCurrency(res.data.currency);
+        setTotalDeposits(res.data.totalDeposits || 0);
+        setTotalSpent(res.data.totalSpent || 0);
       }
     } catch (err) {
       console.error('Wallet balance fetch error:', err);
@@ -56,21 +52,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const depositFunds = async (amount: number) => {
     if (!token) return { success: false, error: 'Unauthorized' };
     try {
-      const res = await fetch('/api/payments/initialize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ amount, currency }),
-      });
-      const data = await res.json();
-      if (data.success && data.paymentUrl) {
-        return { success: true, paymentUrl: data.paymentUrl };
+      const res = await api.post('/payments/initialize', { amount, currency });
+      if (res.data.success && res.data.paymentUrl) {
+        return { success: true, paymentUrl: res.data.paymentUrl };
       }
-      return { success: false, error: data.error || 'Failed to initialize payment' };
+      return { success: false, error: res.data.error || 'Failed to initialize payment' };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Payment network error' };
+      return { success: false, error: getErrorMessage(err) };
     }
   };
 
