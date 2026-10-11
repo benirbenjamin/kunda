@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <!-- Homepage -->
+  <url>
+    <loc>https://kunda.space/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kunda.space/en/" />
+    <xhtml:link rel="alternate" hreflang="rw" href="https://kunda.space/rw/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://kunda.space/fr/" />
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- How It Works -->
+  <url>
+    <loc>https://kunda.space/en/how-it-works</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kunda.space/en/how-it-works" />
+    <xhtml:link rel="alternate" hreflang="rw" href="https://kunda.space/rw/uko-bikora" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://kunda.space/fr/comment-ca-marche" />
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Membership Plans -->
+  <url>
+    <loc>https://kunda.space/en/membership</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kunda.space/en/membership" />
+    <xhtml:link rel="alternate" hreflang="rw" href="https://kunda.space/rw/ibiciro" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://kunda.space/fr/abonnements" />
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Safety Center -->
+  <url>
+    <loc>https://kunda.space/en/safety</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kunda.space/en/safety" />
+    <xhtml:link rel="alternate" hreflang="rw" href="https://kunda.space/rw/umutekano" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://kunda.space/fr/securite" />
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- FAQ -->
+  <url>
+    <loc>https://kunda.space/en/faq</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kunda.space/en/faq" />
+    <xhtml:link rel="alternate" hreflang="rw" href="https://kunda.space/rw/ibibazo" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://kunda.space/fr/faq" />
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>
