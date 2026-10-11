@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "db:migrate": "tsx db/migrate.ts",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "generate:vapid": "node scripts/generate-vapid.cjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
