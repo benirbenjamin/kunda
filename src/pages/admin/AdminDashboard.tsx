@@ -44,6 +44,27 @@ export const AdminDashboard: React.FC = () => {
   const [adjustAmount, setAdjustAmount] = useState(1000);
   const [adjustReason, setAdjustReason] = useState('Promotional / Support Credit');
 
+  // Database Backup to Google Drive State
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupResult, setBackupResult] = useState<any>(null);
+
+  const handleTriggerBackup = async () => {
+    try {
+      setBackupLoading(true);
+      const res = await api.post('/admin/backup', { force: true });
+      if (res.data.success) {
+        setBackupResult(res.data);
+        alert('✅ Database backup generated successfully!\n' + (res.data.driveResult?.success ? 'Uploaded to Google Drive.' : 'Saved locally in /backups'));
+      } else {
+        alert('Backup notice: ' + (res.data.error || res.data.reason || 'Completed'));
+      }
+    } catch (err: any) {
+      alert('Backup failed: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   // Tutorial Modal
   const [tutModalOpen, setTutModalOpen] = useState(false);
   const [tutForm, setTutForm] = useState({
@@ -556,6 +577,49 @@ export const AdminDashboard: React.FC = () => {
                 placeholder="1a2b3c4d5e6f..."
               />
             </div>
+          </div>
+
+          {/* Section 4: Automated MySQL Database Backup (.sql to Google Drive) */}
+          <div className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-primary" /> Daily MySQL Database Backup (.sql)
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Database changes are automatically detected daily, exported as complete <code className="text-slate-700 bg-slate-200 px-1 py-0.5 rounded">.sql</code> dumps, and securely sent to your Google Drive folder. Older backups are permanently preserved without deletion.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={backupLoading}
+                onClick={handleTriggerBackup}
+                className="shrink-0 text-xs py-2 px-3 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              >
+                {backupLoading ? 'Backing Up...' : '⚡ Trigger Backup (.sql) Now'}
+              </Button>
+            </div>
+
+            {backupResult && (
+              <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs text-slate-700 space-y-1">
+                <div className="font-semibold text-emerald-700">Last Trigger Result:</div>
+                <div>File: <span className="font-mono">{backupResult.backupFile || backupResult.lastBackupFile}</span></div>
+                {backupResult.driveResult?.webViewLink && (
+                  <div>
+                    Google Drive:{' '}
+                    <a
+                      href={backupResult.driveResult.webViewLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline font-medium"
+                    >
+                      Open in Google Drive ↗
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <Button type="submit" className="w-full py-3">

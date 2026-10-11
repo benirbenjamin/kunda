@@ -1,26 +1,61 @@
 // =====================================================================
-// KUNDA SPACE: HYBRID POSTGRESQL & MEMORY STORAGE ENGINE
+// KUNDA SPACE: HYBRID MYSQL & IN-MEMORY STORAGE ENGINE
 // =====================================================================
-import pg from 'pg';
+import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const { Pool } = pg;
+// Determine if MySQL database connection parameters are provided
+const dbUrl = process.env.DATABASE_URL || '';
+const hasMysqlConfig = Boolean(
+  dbUrl ||
+  process.env.MYSQL_DATABASE ||
+  process.env.DB_NAME ||
+  process.env.MYSQL_HOST ||
+  process.env.DB_HOST
+);
 
-const hasPostgres = Boolean(process.env.DATABASE_URL);
+let pool: mysql.Pool | null = null;
 
-let pool: pg.Pool | null = null;
-if (hasPostgres) {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
-    max: 10,
-    idleTimeoutMillis: 30000,
-  });
+if (hasMysqlConfig) {
+  try {
+    if (dbUrl) {
+      // Connect using DATABASE_URL string (e.g. mysql://user:pass@host:3306/database)
+      pool = mysql.createPool({
+        uri: dbUrl,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+        multipleStatements: true,
+      });
+    } else {
+      // Connect using individual cPanel environment variables
+      pool = mysql.createPool({
+        host: process.env.MYSQL_HOST || process.env.DB_HOST || '127.0.0.1',
+        port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || '3306', 10),
+        user: process.env.MYSQL_USER || process.env.DB_USER || 'root',
+        password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || '',
+        database: process.env.MYSQL_DATABASE || process.env.DB_NAME || 'kunda_space',
+        ssl: process.env.MYSQL_SSL === 'true' || process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+        multipleStatements: true,
+      });
+    }
+    console.log('📦 MySQL connection pool initialized successfully.');
+  } catch (poolErr) {
+    console.warn('⚠️ Could not initialize MySQL pool, falling back to memory store:', poolErr);
+    pool = null;
+  }
 }
 
-// In-Memory Database store for instant execution when DATABASE_URL is not yet connected
+// In-Memory Database store for instant execution when MySQL is not yet connected
 export const memoryStore = {
   users: [] as any[],
   profiles: [] as any[],
@@ -311,18 +346,51 @@ function initMemoryStore() {
 
 initMemoryStore();
 
+/**
+ * Universal Query Adapter: Executes SQL on MySQL connection pool
+ * Automatically translates PostgreSQL parameter placeholders ($1, $2, ...) to MySQL (?)
+ * and translates Postgres syntax (like ON CONFLICT) to MySQL compatible equivalents.
+ */
 export async function query(sql: string, params: any[] = []): Promise<any> {
   if (pool) {
     try {
-      const res = await pool.query(sql, params);
-      return res;
+      // 1. Translate PostgreSQL parameter markers ($1, $2, $3...) to MySQL (?)
+      let mysqlSql = sql.replace(/\$(\d+)/g, '?');
+
+      // 2. Translate PostgreSQL "ON CONFLICT ... DO NOTHING" to MySQL "ON DUPLICATE KEY UPDATE id=id"
+      mysqlSql = mysqlSql.replace(/ON\s+CONFLICT\s*\([^)]*\)\s*DO\s*NOTHING/gi, 'ON DUPLICATE KEY UPDATE id=id');
+      mysqlSql = mysqlSql.replace(/ON\s+CONFLICT\s*DO\s*NOTHING/gi, 'ON DUPLICATE KEY UPDATE id=id');
+
+      // 3. Remove PostgreSQL "RETURNING ..." clause if present
+      mysqlSql = mysqlSql.replace(/\s+RETURNING\s+[\w,\s.*]+/gi, '');
+
+      // 4. Execute query on MySQL pool
+      const [results] = await pool.query(mysqlSql, params);
+
+      // 5. Provide standard PostgreSQL-like response object for code backward compatibility
+      if (Array.isArray(results)) {
+        return {
+          rows: results,
+          rowCount: results.length,
+        };
+      }
+
+      const header = results as mysql.ResultSetHeader;
+      return {
+        rows: [],
+        rowCount: header.affectedRows ?? 0,
+        insertId: header.insertId ?? null,
+      };
     } catch (err) {
-      console.error('PostgreSQL query error, falling back to memory store:', err);
+      console.error('MySQL query error, falling back to memory store:', err);
     }
   }
   return null;
 }
 
-export function getDbPool() {
+/**
+ * Returns active MySQL connection pool
+ */
+export function getDbPool(): mysql.Pool | null {
   return pool;
 }

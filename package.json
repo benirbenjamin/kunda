@@ -13,6 +13,8 @@
     "test": "vitest run",
     "db:migrate": "tsx db/migrate.ts",
     "db:seed": "tsx db/seed.ts",
+    "db:backup": "node scripts/backup-db.cjs",
+    "db:backup:force": "node scripts/backup-db.cjs --force",
     "generate:vapid": "node scripts/generate-vapid.cjs"
   },
   "dependencies": {
@@ -24,6 +26,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.475.0",
+    "mysql2": "^3.24.5",
     "nodemailer": "^10.1.0",
     "pg": "^8.13.3",
     "react": "^18.3.1",
