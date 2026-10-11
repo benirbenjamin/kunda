@@ -68,7 +68,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
   // 2. SMTP Transport (nodemailer)
   if (config.provider === 'smtp' && config.smtpHost && config.smtpUser) {
     try {
-      const transporter = nodemailer.createTransporter({
+      const transporter = nodemailer.createTransport({
         host: config.smtpHost,
         port: config.smtpPort,
         secure: config.smtpSecure,

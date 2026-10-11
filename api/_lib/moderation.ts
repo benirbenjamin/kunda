@@ -18,7 +18,7 @@ const EN_NUMBER_WORDS: Record<string, string> = {
 
 // 2. Spelled out numbers in Kinyarwanda
 const RW_NUMBER_WORDS: Record<string, string> = {
-  zeru: '0', rimwe: '1', kabiri: '2', gatatu: '3', kane: '4',
+  zeru: '0', zero: '0', rimwe: '1', kabiri: '2', gatatu: '3', kane: '4',
   gatanu: '5', gatandatu: '6', karindwi: '7', umunani: '8', icyenda: '9', icumi: '10'
 };
 
@@ -196,3 +196,16 @@ export function checkMessageModeration(message: string): ModerationResult {
 
   return { isViolation: false };
 }
+
+/**
+ * Convenience wrapper returning boolean flags for clean/policy checks
+ */
+export function moderateMessageContent(text: string) {
+  const result = checkMessageModeration(text);
+  return {
+    isClean: !result.isViolation,
+    violatesContactPolicy: result.isViolation,
+    ...result,
+  };
+}
+

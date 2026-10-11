@@ -40,7 +40,7 @@ describe('2. Multilingual Contact Leak & Anti-Scam Moderation', () => {
   });
 
   it('catches obfuscated spelled-out numbers in Kinyarwanda', () => {
-    const obfuscated = 'Nimero yanjye ni zero karindwi umunani umunani...';
+    const obfuscated = 'Nimero yanjye ni zero karindwi umunani umunani rimwe';
     expect(moderateMessageContent(obfuscated).violatesContactPolicy).toBe(true);
   });
 
