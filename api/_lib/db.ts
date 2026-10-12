@@ -1,28 +1,41 @@
 // =====================================================================
-// KUNDA SPACE: HYBRID MYSQL & IN-MEMORY STORAGE ENGINE
+// KUNDA SPACE: HYBRID POSTGRESQL, MYSQL & IN-MEMORY STORAGE ENGINE
 // =====================================================================
+import pg from 'pg';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Determine if MySQL database connection parameters are provided
-const dbUrl = process.env.DATABASE_URL || '';
-const hasMysqlConfig = Boolean(
-  dbUrl ||
-  process.env.MYSQL_DATABASE ||
-  process.env.DB_NAME ||
-  process.env.MYSQL_HOST ||
-  process.env.DB_HOST
-);
+const { Pool: PgPool } = pg;
 
-let pool: mysql.Pool | null = null;
+const dbUrl = (process.env.DATABASE_URL || '').trim();
+const isPostgres = dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://');
+const isMysql =
+  dbUrl.startsWith('mysql://') ||
+  Boolean(process.env.MYSQL_DATABASE || process.env.DB_NAME || process.env.MYSQL_HOST || process.env.DB_HOST);
 
-if (hasMysqlConfig) {
+let pgPool: pg.Pool | null = null;
+let mysqlPool: mysql.Pool | null = null;
+
+if (isPostgres) {
+  try {
+    pgPool = new PgPool({
+      connectionString: dbUrl,
+      ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
+    console.log('📦 PostgreSQL connection pool initialized.');
+  } catch (pgErr) {
+    console.warn('⚠️ Could not initialize PostgreSQL pool, falling back to memory store:', pgErr);
+    pgPool = null;
+  }
+} else if (isMysql) {
   try {
     if (dbUrl) {
-      // Connect using DATABASE_URL string (e.g. mysql://user:pass@host:3306/database)
-      pool = mysql.createPool({
+      mysqlPool = mysql.createPool({
         uri: dbUrl,
         waitForConnections: true,
         connectionLimit: 10,
@@ -32,8 +45,7 @@ if (hasMysqlConfig) {
         multipleStatements: true,
       });
     } else {
-      // Connect using individual cPanel environment variables
-      pool = mysql.createPool({
+      mysqlPool = mysql.createPool({
         host: process.env.MYSQL_HOST || process.env.DB_HOST || '127.0.0.1',
         port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || '3306', 10),
         user: process.env.MYSQL_USER || process.env.DB_USER || 'root',
@@ -48,10 +60,10 @@ if (hasMysqlConfig) {
         multipleStatements: true,
       });
     }
-    console.log('📦 MySQL connection pool initialized successfully.');
+    console.log('📦 MySQL connection pool initialized.');
   } catch (poolErr) {
     console.warn('⚠️ Could not initialize MySQL pool, falling back to memory store:', poolErr);
-    pool = null;
+    mysqlPool = null;
   }
 }
 
@@ -347,27 +359,30 @@ function initMemoryStore() {
 initMemoryStore();
 
 /**
- * Universal Query Adapter: Executes SQL on MySQL connection pool
- * Automatically translates PostgreSQL parameter placeholders ($1, $2, ...) to MySQL (?)
- * and translates Postgres syntax (like ON CONFLICT) to MySQL compatible equivalents.
+ * Universal Query Adapter: Executes SQL on active PostgreSQL or MySQL connection pool
+ * Automatically translates query syntax if running on MySQL, or executes natively on PostgreSQL.
  */
 export async function query(sql: string, params: any[] = []): Promise<any> {
-  if (pool) {
+  // 1. If PostgreSQL connection pool is available, execute natively
+  if (pgPool) {
     try {
-      // 1. Translate PostgreSQL parameter markers ($1, $2, $3...) to MySQL (?)
-      let mysqlSql = sql.replace(/\$(\d+)/g, '?');
+      const res = await pgPool.query(sql, params);
+      return res;
+    } catch (err) {
+      console.warn('PostgreSQL query error, falling back to memory store:', err);
+    }
+  }
 
-      // 2. Translate PostgreSQL "ON CONFLICT ... DO NOTHING" to MySQL "ON DUPLICATE KEY UPDATE id=id"
+  // 2. If MySQL connection pool is available, translate and execute
+  if (mysqlPool) {
+    try {
+      let mysqlSql = sql.replace(/\$(\d+)/g, '?');
       mysqlSql = mysqlSql.replace(/ON\s+CONFLICT\s*\([^)]*\)\s*DO\s*NOTHING/gi, 'ON DUPLICATE KEY UPDATE id=id');
       mysqlSql = mysqlSql.replace(/ON\s+CONFLICT\s*DO\s*NOTHING/gi, 'ON DUPLICATE KEY UPDATE id=id');
-
-      // 3. Remove PostgreSQL "RETURNING ..." clause if present
       mysqlSql = mysqlSql.replace(/\s+RETURNING\s+[\w,\s.*]+/gi, '');
 
-      // 4. Execute query on MySQL pool
-      const [results] = await pool.query(mysqlSql, params);
+      const [results] = await mysqlPool.query(mysqlSql, params);
 
-      // 5. Provide standard PostgreSQL-like response object for code backward compatibility
       if (Array.isArray(results)) {
         return {
           rows: results,
@@ -382,15 +397,16 @@ export async function query(sql: string, params: any[] = []): Promise<any> {
         insertId: header.insertId ?? null,
       };
     } catch (err) {
-      console.error('MySQL query error, falling back to memory store:', err);
+      console.warn('MySQL query error, falling back to memory store:', err);
     }
   }
+
   return null;
 }
 
 /**
- * Returns active MySQL connection pool
+ * Returns active database connection pool (PostgreSQL or MySQL)
  */
-export function getDbPool(): mysql.Pool | null {
-  return pool;
+export function getDbPool(): pg.Pool | mysql.Pool | null {
+  return pgPool || mysqlPool;
 }

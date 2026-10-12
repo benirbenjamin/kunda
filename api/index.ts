@@ -69,59 +69,87 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
-  // Resolve path from rewrite query param `path`, headers, or req.url
-  let resolvedPath = '';
-  if (Array.isArray(req.query?.path)) {
-    resolvedPath = req.query.path.join('/');
-  } else if (typeof req.query?.path === 'string') {
-    resolvedPath = req.query.path;
-  }
-
-  if (!resolvedPath) {
-    const rawUrl =
-      (req.headers['x-matched-path'] as string) ||
-      (req.headers['x-forwarded-uri'] as string) ||
-      req.url ||
-      '';
-    const cleanUrl = rawUrl.split('?')[0];
-    resolvedPath = cleanUrl.replace(/^\/api\/?/, '').replace(/^\//, '');
-  }
-
-  // Normalize path: strip query params if any and trim slashes
-  resolvedPath = resolvedPath.split('?')[0].replace(/^\/+/, '').replace(/\/+$/, '');
-
-  // Safe body parsing: if body arrived as string, parse it to JSON
-  if (typeof req.body === 'string' && req.body.trim().length > 0) {
-    try {
-      req.body = JSON.parse(req.body);
-    } catch (parseErr) {
-      console.warn('Failed to parse string request body as JSON:', parseErr);
+  try {
+    // 1. Resolve path from query param (Vercel rewrite: /api/index?path=$1)
+    let resolvedPath = '';
+    if (Array.isArray(req.query?.path)) {
+      resolvedPath = req.query.path.join('/');
+    } else if (typeof req.query?.path === 'string') {
+      resolvedPath = req.query.path;
     }
-  } else if (!req.body && req.method !== 'GET') {
-    req.body = {};
-  }
 
-  const targetHandler = routes[resolvedPath];
+    // 2. Extract path from URL query string if not parsed in req.query
+    if (!resolvedPath && typeof req.url === 'string') {
+      const match = req.url.match(/[?&]path=([^&]+)/);
+      if (match && match[1]) {
+        resolvedPath = decodeURIComponent(match[1]);
+      }
+    }
 
-  if (targetHandler) {
-    try {
-      return await targetHandler(req, res);
-    } catch (err: any) {
-      console.error(`API execution error on [${req.method}] /api/${resolvedPath}:`, err);
+    // 3. Fallback to matched headers or direct req.url
+    if (!resolvedPath || resolvedPath === 'index') {
+      const rawUrl =
+        (req.headers['x-matched-path'] as string) ||
+        (req.headers['x-forwarded-uri'] as string) ||
+        req.url ||
+        '';
+      const cleanUrl = rawUrl.split('?')[0];
+      resolvedPath = cleanUrl.replace(/^\/api\/?/, '').replace(/^\//, '');
+    }
+
+    // Normalize: strip leading/trailing slashes and leading 'api/'
+    resolvedPath = resolvedPath
+      .split('?')[0]
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+      .replace(/^api\//, '');
+
+    // Safe body parsing: if body arrived as string, parse it to JSON
+    if (typeof req.body === 'string' && req.body.trim().length > 0) {
+      try {
+        req.body = JSON.parse(req.body);
+      } catch (parseErr) {
+        console.warn('Failed to parse string request body as JSON:', parseErr);
+      }
+    } else if (!req.body && req.method !== 'GET') {
+      req.body = {};
+    }
+
+    const targetHandler = routes[resolvedPath];
+
+    if (targetHandler) {
+      try {
+        return await targetHandler(req, res);
+      } catch (err: any) {
+        console.error(`API execution error on [${req.method}] /api/${resolvedPath}:`, err);
+        return res.status(500).json({
+          success: false,
+          error: err.message || 'Internal Server Error',
+        });
+      }
+    }
+
+    // Health check fallback
+    if (resolvedPath === 'health' || resolvedPath === '' || resolvedPath === 'index') {
+      return res.status(200).json({
+        status: 'ok',
+        platform: 'Kunda Space API',
+        version: '1.0.0',
+        resolvedPath,
+      });
+    }
+
+    return res.status(404).json({
+      success: false,
+      error: `API route not found: /api/${resolvedPath}`,
+    });
+  } catch (fatalErr: any) {
+    console.error('Fatal API dispatcher crash:', fatalErr);
+    if (!res.headersSent) {
       return res.status(500).json({
         success: false,
-        error: err.message || 'Internal Server Error',
+        error: fatalErr?.message || 'Server execution error',
       });
     }
   }
-
-  // Health check fallback
-  if (resolvedPath === 'health' || resolvedPath === '') {
-    return res.status(200).json({ status: 'ok', platform: 'Kunda Space API', version: '1.0.0' });
-  }
-
-  return res.status(404).json({
-    success: false,
-    error: `API route not found: /api/${resolvedPath}`,
-  });
 }
