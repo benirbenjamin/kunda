@@ -35,7 +35,7 @@ export default async function handler(req: any, res: any) {
       maxAgePref,
       datingScope,
       appearanceSkinTone,
-    } = req.body;
+    } = req.body || {};
 
     // 1. Mandatory server-side fields check
     if (!email || !password || !dob || !displayName || !gender || !interestedIn) {

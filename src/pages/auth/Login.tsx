@@ -34,7 +34,8 @@ export const Login: React.FC = () => {
         login(data.token, data.user, data.profile);
         navigate('/dashboard/discover');
       } else {
-        setError(data.error || t('auth.loginError'));
+        const errorMsg = data.error ? getErrorMessage(data.error) : t('auth.loginError');
+        setError(errorMsg);
       }
     } catch (err: any) {
       setError(getErrorMessage(err));
@@ -57,7 +58,7 @@ export const Login: React.FC = () => {
         {error && (
           <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5 text-xs text-red-600 font-medium">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+            <span>{typeof error === 'string' ? error : getErrorMessage(error)}</span>
           </div>
         )}
 

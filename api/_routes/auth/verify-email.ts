@@ -9,7 +9,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { email, code, token } = req.body;
+    const { email, code, token } = req.body || {};
 
     if (!email && !token) {
       return res.status(400).json({ success: false, error: 'Email address or verification token is required' });

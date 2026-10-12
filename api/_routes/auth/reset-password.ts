@@ -10,7 +10,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { email, code, token, newPassword } = req.body;
+    const { email, code, token, newPassword } = req.body || {};
 
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ success: false, error: 'New password must be at least 6 characters long' });

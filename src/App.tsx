@@ -6,6 +6,7 @@ import { WalletProvider } from './contexts/WalletContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 // Public Pages
 import { Home } from './pages/public/Home';
@@ -83,7 +84,8 @@ export const AppContent: React.FC = () => {
       <LanguageSyncer />
       <Navbar />
       <main className="flex-1">
-        <Routes>
+        <ErrorBoundary>
+          <Routes>
           {/* Public Website Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
@@ -184,6 +186,7 @@ export const AppContent: React.FC = () => {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>
@@ -192,16 +195,18 @@ export const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <LanguageProvider>
-        <AuthProvider>
-          <WalletProvider>
-            <NotificationProvider>
-              <AppContent />
-            </NotificationProvider>
-          </WalletProvider>
-        </AuthProvider>
-      </LanguageProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <LanguageProvider>
+          <AuthProvider>
+            <WalletProvider>
+              <NotificationProvider>
+                <AppContent />
+              </NotificationProvider>
+            </WalletProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

@@ -50,7 +50,8 @@ export const ResetPassword: React.FC = () => {
         setSuccess(true);
         setTimeout(() => navigate('/auth/login'), 2500);
       } else {
-        setError(data.error || 'Failed to reset password. Please check the code.');
+        const errorMsg = data.error ? getErrorMessage(data.error) : 'Failed to reset password. Please check the code.';
+        setError(errorMsg);
       }
     } catch (err: any) {
       setError(getErrorMessage(err));
@@ -75,7 +76,7 @@ export const ResetPassword: React.FC = () => {
         {error && (
           <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5 text-xs text-red-600 font-medium">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+            <span>{typeof error === 'string' ? error : getErrorMessage(error)}</span>
           </div>
         )}
 

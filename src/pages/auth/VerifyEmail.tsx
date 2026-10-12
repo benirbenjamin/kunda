@@ -47,7 +47,8 @@ export const VerifyEmail: React.FC = () => {
         await refreshSession();
         setTimeout(() => navigate('/dashboard/discover'), 2500);
       } else {
-        setError(data.error || 'Verification failed. Please check the code.');
+        const errorMsg = data.error ? getErrorMessage(data.error) : 'Verification failed. Please check the code.';
+        setError(errorMsg);
       }
     } catch (err: any) {
       setError(getErrorMessage(err));
@@ -72,7 +73,7 @@ export const VerifyEmail: React.FC = () => {
         {error && (
           <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5 text-xs text-red-600 font-medium">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+            <span>{typeof error === 'string' ? error : getErrorMessage(error)}</span>
           </div>
         )}
 

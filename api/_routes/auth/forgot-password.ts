@@ -11,7 +11,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { email } = req.body;
+    const { email } = req.body || {};
     if (!email) {
       return res.status(400).json({ success: false, error: 'Email address is required' });
     }

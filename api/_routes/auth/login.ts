@@ -10,7 +10,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Email and password are required.' });

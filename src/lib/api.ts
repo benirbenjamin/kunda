@@ -22,14 +22,23 @@ api.interceptors.request.use(
 );
 
 /**
- * Extracts a human-friendly error string from Axios or network errors
+ * Extracts a human-friendly error string from Axios or network errors.
+ * Guaranteed to always return a string and never an object, preventing React child rendering errors.
  */
 export function getErrorMessage(error: any): string {
   if (!error) return 'An unexpected error occurred.';
 
+  // If already a string
+  if (typeof error === 'string') {
+    return error;
+  }
+
   // If response contains data
   const errData = error.response?.data;
   if (errData) {
+    if (typeof errData === 'string') {
+      return errData;
+    }
     if (typeof errData.error === 'string') {
       return errData.error;
     }
@@ -40,13 +49,32 @@ export function getErrorMessage(error: any): string {
       if (typeof errData.error.code === 'string') {
         return `Error: ${errData.error.code}`;
       }
-      return JSON.stringify(errData.error);
+      try {
+        return JSON.stringify(errData.error);
+      } catch {
+        return 'An error occurred processing the request.';
+      }
     }
     if (typeof errData.message === 'string') {
       return errData.message;
     }
-    if (typeof errData === 'string') {
-      return errData;
+    if (typeof errData.message === 'object' && errData.message !== null) {
+      if (typeof errData.message.message === 'string') {
+        return errData.message.message;
+      }
+      try {
+        return JSON.stringify(errData.message);
+      } catch {
+        return 'An error occurred processing the request.';
+      }
+    }
+    if (typeof errData.code === 'string') {
+      return `Error: ${errData.code}`;
+    }
+    try {
+      return JSON.stringify(errData);
+    } catch {
+      return 'An unexpected error occurred.';
     }
   }
 
@@ -81,5 +109,25 @@ export function getErrorMessage(error: any): string {
     return error.message;
   }
 
-  return 'An unexpected error occurred. Please try again.';
+  // If error has code property
+  if (typeof error.code === 'string') {
+    return `Error: ${error.code}`;
+  }
+
+  // If error is an arbitrary object
+  if (typeof error === 'object' && error !== null) {
+    if (typeof (error as any).error === 'string') {
+      return (error as any).error;
+    }
+    if (typeof (error as any).message === 'string') {
+      return (error as any).message;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'An unexpected error occurred.';
+    }
+  }
+
+  return String(error);
 }

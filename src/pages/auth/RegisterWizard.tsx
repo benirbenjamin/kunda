@@ -232,7 +232,8 @@ export const RegisterWizard: React.FC = () => {
         login(data.token, data.user, data.profile);
         navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
       } else {
-        setError(data.error || 'Registration failed. Please check your information.');
+        const errorMsg = data.error ? getErrorMessage(data.error) : 'Registration failed. Please check your information.';
+        setError(errorMsg);
       }
     } catch (err: any) {
       setError(getErrorMessage(err));
@@ -277,7 +278,7 @@ export const RegisterWizard: React.FC = () => {
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-xs sm:text-sm text-red-600 font-semibold animate-shake">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{error}</span>
+            <span>{typeof error === 'string' ? error : getErrorMessage(error)}</span>
           </div>
         )}
 
