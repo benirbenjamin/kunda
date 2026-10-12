@@ -1,8 +1,8 @@
 // =====================================================================
 // GET /api/wallet/transactions - Immutable Ledger Audit History
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { getTransactionHistory } from '../../_lib/wallet';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { getTransactionHistory } from '../../_lib/wallet.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

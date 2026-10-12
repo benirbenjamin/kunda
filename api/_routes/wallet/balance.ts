@@ -1,8 +1,8 @@
 // =====================================================================
 // GET /api/wallet/balance - Real Ledger Balance & Financial Overview
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { getWalletBalance, getTransactionHistory } from '../../_lib/wallet';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { getWalletBalance, getTransactionHistory } from '../../_lib/wallet.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

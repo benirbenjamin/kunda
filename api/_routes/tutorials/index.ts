@@ -2,8 +2,8 @@
 // GET & POST /api/tutorials - Registration & Onboarding Tutorials
 // =====================================================================
 import crypto from 'crypto';
-import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
+import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   // GET: Fetch tutorials (available publicly for registration & onboarding)

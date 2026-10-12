@@ -2,11 +2,11 @@
 // GET & POST /api/messages/send - Messaging with Allowance & Moderation
 // =====================================================================
 import crypto from 'crypto';
-import { extractAuthUser } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
-import { checkMessageModeration } from '../../_lib/moderation';
-import { debitWallet, getWalletBalance } from '../../_lib/wallet';
-import { BUSINESS_CONFIG } from '../../_lib/config';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
+import { checkMessageModeration } from '../../_lib/moderation.js';
+import { debitWallet, getWalletBalance } from '../../_lib/wallet.js';
+import { BUSINESS_CONFIG } from '../../_lib/config.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

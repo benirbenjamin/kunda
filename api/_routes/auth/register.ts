@@ -2,10 +2,10 @@
 // POST /api/auth/register - Three-step wizard submission & adult check
 // =====================================================================
 import crypto from 'crypto';
-import { isAdult, hashPassword, generateToken } from '../../_lib/auth';
-import { memoryStore, query } from '../../_lib/db';
-import { BUSINESS_CONFIG } from '../../_lib/config';
-import { sendVerificationEmail } from '../../_lib/email';
+import { isAdult, hashPassword, generateToken } from '../../_lib/auth.js';
+import { memoryStore, query } from '../../_lib/db.js';
+import { BUSINESS_CONFIG } from '../../_lib/config.js';
+import { sendVerificationEmail } from '../../_lib/email.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

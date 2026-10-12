@@ -1,9 +1,9 @@
 // =====================================================================
 // GET /api/auth/me - Authenticated session state
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
-import { getWalletBalance } from '../../_lib/wallet';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
+import { getWalletBalance } from '../../_lib/wallet.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

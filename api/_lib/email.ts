@@ -2,7 +2,7 @@
 // KUNDA SPACE: DYNAMIC EMAIL SERVICE (Resend, SMTP & Mock)
 // =====================================================================
 import nodemailer from 'nodemailer';
-import { memoryStore } from './db';
+import { memoryStore } from './db.js';
 
 export interface EmailOptions {
   to: string;

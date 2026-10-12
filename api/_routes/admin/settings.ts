@@ -1,9 +1,9 @@
 // =====================================================================
 // GET & POST /api/admin/settings - Dynamic Business Configuration
 // =====================================================================
-import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
-import { BUSINESS_CONFIG } from '../../_lib/config';
+import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
+import { BUSINESS_CONFIG } from '../../_lib/config.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

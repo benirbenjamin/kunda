@@ -1,8 +1,8 @@
 // =====================================================================
 // GET /api/admin/moderation - Review Flagged Events & User Reports
 // =====================================================================
-import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
+import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

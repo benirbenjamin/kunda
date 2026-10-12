@@ -1,10 +1,10 @@
 // =====================================================================
 // POST /api/payments/verify - Verify Payment & Credit Wallet
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { creditWallet, getWalletBalance } from '../../_lib/wallet';
-import { verifyPaymentWithFlutterwave } from '../../_lib/flutterwave';
-import { memoryStore } from '../../_lib/db';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { creditWallet, getWalletBalance } from '../../_lib/wallet.js';
+import { verifyPaymentWithFlutterwave } from '../../_lib/flutterwave.js';
+import { memoryStore } from '../../_lib/db.js';
 import crypto from 'crypto';
 
 export default async function handler(req: any, res: any) {

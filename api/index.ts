@@ -1,33 +1,33 @@
 // =====================================================================
 // KUNDA SPACE: CONSOLIDATED SERVERLESS FUNCTION DISPATCHER (Vercel)
 // =====================================================================
-import registerHandler from './_routes/auth/register';
-import loginHandler from './_routes/auth/login';
-import meHandler from './_routes/auth/me';
-import verifyEmailHandler from './_routes/auth/verify-email';
-import forgotPasswordHandler from './_routes/auth/forgot-password';
-import resetPasswordHandler from './_routes/auth/reset-password';
-import uploadHandler from './_routes/upload/index';
-import tutorialsHandler from './_routes/tutorials/index';
-import discoverHandler from './_routes/members/discover';
-import interactionHandler from './_routes/members/interaction';
-import matchesHandler from './_routes/members/matches';
-import conversationsHandler from './_routes/messages/conversations';
-import sendHandler from './_routes/messages/send';
-import unlockContactHandler from './_routes/messages/unlock-contact';
-import balanceHandler from './_routes/wallet/balance';
-import transactionsHandler from './_routes/wallet/transactions';
-import initPaymentHandler from './_routes/payments/initialize';
-import webhookHandler from './_routes/payments/webhook';
-import verifyPaymentHandler from './_routes/payments/verify';
-import plansHandler from './_routes/subscriptions/plans';
-import subscribeHandler from './_routes/subscriptions/subscribe';
-import notificationsHandler from './_routes/notifications/index';
-import adminMetricsHandler from './_routes/admin/metrics';
-import adminUsersHandler from './_routes/admin/users';
-import adminSettingsHandler from './_routes/admin/settings';
-import adminModerationHandler from './_routes/admin/moderation';
-import adminLedgerHandler from './_routes/admin/ledger';
+import registerHandler from './_routes/auth/register.js';
+import loginHandler from './_routes/auth/login.js';
+import meHandler from './_routes/auth/me.js';
+import verifyEmailHandler from './_routes/auth/verify-email.js';
+import forgotPasswordHandler from './_routes/auth/forgot-password.js';
+import resetPasswordHandler from './_routes/auth/reset-password.js';
+import uploadHandler from './_routes/upload/index.js';
+import tutorialsHandler from './_routes/tutorials/index.js';
+import discoverHandler from './_routes/members/discover.js';
+import interactionHandler from './_routes/members/interaction.js';
+import matchesHandler from './_routes/members/matches.js';
+import conversationsHandler from './_routes/messages/conversations.js';
+import sendHandler from './_routes/messages/send.js';
+import unlockContactHandler from './_routes/messages/unlock-contact.js';
+import balanceHandler from './_routes/wallet/balance.js';
+import transactionsHandler from './_routes/wallet/transactions.js';
+import initPaymentHandler from './_routes/payments/initialize.js';
+import webhookHandler from './_routes/payments/webhook.js';
+import verifyPaymentHandler from './_routes/payments/verify.js';
+import plansHandler from './_routes/subscriptions/plans.js';
+import subscribeHandler from './_routes/subscriptions/subscribe.js';
+import notificationsHandler from './_routes/notifications/index.js';
+import adminMetricsHandler from './_routes/admin/metrics.js';
+import adminUsersHandler from './_routes/admin/users.js';
+import adminSettingsHandler from './_routes/admin/settings.js';
+import adminModerationHandler from './_routes/admin/moderation.js';
+import adminLedgerHandler from './_routes/admin/ledger.js';
 
 const routes: Record<string, (req: any, res: any) => Promise<any> | any> = {
   'auth/login': loginHandler,

@@ -1,8 +1,8 @@
 // =====================================================================
 // POST /api/auth/reset-password - Complete Password Reset
 // =====================================================================
-import { hashPassword } from '../../_lib/auth';
-import { memoryStore, query } from '../../_lib/db';
+import { hashPassword } from '../../_lib/auth.js';
+import { memoryStore, query } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

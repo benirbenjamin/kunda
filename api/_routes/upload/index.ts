@@ -1,8 +1,8 @@
 // =====================================================================
 // POST /api/upload - Upload Content to Google Drive (Refresh Token)
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { uploadToGoogleDrive } from '../../_lib/drive';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { uploadToGoogleDrive } from '../../_lib/drive.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

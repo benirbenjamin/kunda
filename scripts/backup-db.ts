@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import { getDriveConfig, uploadBackupToGoogleDrive } from '../api/_lib/drive';
+import { getDriveConfig, uploadBackupToGoogleDrive } from '../api/_lib/drive.js';
 
 dotenv.config();
 

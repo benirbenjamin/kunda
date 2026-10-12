@@ -4,8 +4,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth';
-import { runDatabaseBackup } from '../../../scripts/backup-db';
+import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
+import { runDatabaseBackup } from '../../../scripts/backup-db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

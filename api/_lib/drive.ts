@@ -1,7 +1,7 @@
 // =====================================================================
 // KUNDA SPACE: GOOGLE DRIVE REFRESH TOKEN OBJECT STORAGE SERVICE
 // =====================================================================
-import { memoryStore } from './db';
+import { memoryStore } from './db.js';
 
 export interface DriveConfig {
   clientId: string;

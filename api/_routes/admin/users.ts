@@ -1,8 +1,8 @@
 // =====================================================================
 // GET & POST /api/admin/users - User Management & Account Moderation
 // =====================================================================
-import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth';
-import { memoryStore, query } from '../../_lib/db';
+import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
+import { memoryStore, query } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

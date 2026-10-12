@@ -2,8 +2,8 @@
 // POST /api/members/interaction - Like, Pass, Superlike & Mutual Matching
 // =====================================================================
 import crypto from 'crypto';
-import { extractAuthUser } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

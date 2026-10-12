@@ -1,7 +1,7 @@
 // =====================================================================
 // POST /api/auth/verify-email - Verify Email by Code or Link Token
 // =====================================================================
-import { memoryStore, query } from '../../_lib/db';
+import { memoryStore, query } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

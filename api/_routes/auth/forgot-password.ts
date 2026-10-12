@@ -2,8 +2,8 @@
 // POST /api/auth/forgot-password - Request Password Reset Email
 // =====================================================================
 import crypto from 'crypto';
-import { memoryStore, query } from '../../_lib/db';
-import { sendPasswordResetEmail } from '../../_lib/email';
+import { memoryStore, query } from '../../_lib/db.js';
+import { sendPasswordResetEmail } from '../../_lib/email.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

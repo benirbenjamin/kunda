@@ -1,9 +1,9 @@
 // =====================================================================
 // GET & POST /api/admin/ledger - Platform-Wide Financial Ledger & Audit
 // =====================================================================
-import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
-import { creditWallet } from '../../_lib/wallet';
+import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
+import { creditWallet } from '../../_lib/wallet.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

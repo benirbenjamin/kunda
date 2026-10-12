@@ -1,9 +1,9 @@
 // =====================================================================
 // POST /api/payments/webhook - Flutterwave Webhook Listener
 // =====================================================================
-import { verifyFlutterwaveWebhookSignature } from '../../_lib/flutterwave';
-import { creditWallet } from '../../_lib/wallet';
-import { memoryStore } from '../../_lib/db';
+import { verifyFlutterwaveWebhookSignature } from '../../_lib/flutterwave.js';
+import { creditWallet } from '../../_lib/wallet.js';
+import { memoryStore } from '../../_lib/db.js';
 import crypto from 'crypto';
 
 export default async function handler(req: any, res: any) {

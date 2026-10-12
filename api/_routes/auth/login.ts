@@ -1,8 +1,8 @@
 // =====================================================================
 // POST /api/auth/login - Secure login endpoint
 // =====================================================================
-import { comparePassword, generateToken } from '../../_lib/auth';
-import { memoryStore, query } from '../../_lib/db';
+import { comparePassword, generateToken } from '../../_lib/auth.js';
+import { memoryStore, query } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

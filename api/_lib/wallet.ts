@@ -1,7 +1,7 @@
 // =====================================================================
 // KUNDA SPACE: ATOMIC WALLET & IMMUTABLE LEDGER SERVICE
 // =====================================================================
-import { memoryStore, query } from './db';
+import { memoryStore, query } from './db.js';
 import crypto from 'crypto';
 
 export interface WalletTransaction {

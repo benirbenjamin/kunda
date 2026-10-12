@@ -1,9 +1,9 @@
 // =====================================================================
 // GET /api/members/discover - Algorithmic recommendation endpoint
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
-import { calculateCompatibility, ProfileData } from '../../_lib/matching';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
+import { calculateCompatibility, ProfileData } from '../../_lib/matching.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

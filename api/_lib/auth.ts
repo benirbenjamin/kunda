@@ -3,7 +3,7 @@
 // =====================================================================
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { BUSINESS_CONFIG } from './config';
+import { BUSINESS_CONFIG } from './config.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'kunda-space-super-secure-production-jwt-token-2026';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';

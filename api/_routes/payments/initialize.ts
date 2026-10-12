@@ -1,9 +1,9 @@
 // =====================================================================
 // POST /api/payments/initialize - Initiate Deposit with Flutterwave
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
-import { initializeFlutterwavePayment } from '../../_lib/flutterwave';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
+import { initializeFlutterwavePayment } from '../../_lib/flutterwave.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

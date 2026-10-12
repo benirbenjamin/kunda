@@ -1,8 +1,8 @@
 // =====================================================================
 // GET /api/members/matches - List mutual matches
 // =====================================================================
-import { extractAuthUser } from '../../_lib/auth';
-import { memoryStore } from '../../_lib/db';
+import { extractAuthUser } from '../../_lib/auth.js';
+import { memoryStore } from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

@@ -1,8 +1,8 @@
 // =====================================================================
 // KUNDA SPACE: ALGORITHMIC MATCHING & COMPATIBILITY ENGINE
 // =====================================================================
-import { BUSINESS_CONFIG } from './config';
-import { calculateAge } from './auth';
+import { BUSINESS_CONFIG } from './config.js';
+import { calculateAge } from './auth.js';
 
 export interface ProfileData {
   id: string;
