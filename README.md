@@ -223,6 +223,54 @@ Admins can post, edit, reorder, and toggle onboarding tutorials from the Admin P
 
 ---
 
+## 🚀 cPanel & MySQL Deployment Guide
+
+Kunda Space is configured for seamless deployment on cPanel hosting (CloudLinux Node.js Selector, Passenger, or VPS).
+
+### 1. Create MySQL Database in cPanel
+1. Log into your **cPanel Dashboard**.
+2. Go to **MySQL Databases**:
+   - Create a database: e.g. `cpaneluser_kunda`.
+   - Create a user: e.g. `cpaneluser_dbuser` with a strong password.
+   - Assign the user to the database with **ALL PRIVILEGES**.
+3. Open **phpMyAdmin** from cPanel:
+   - Select your database.
+   - Click **Import** -> Choose file [`db/schema.sql`](file:///c:/Users/DEV/Desktop/kunda/db/schema.sql) -> Click **Go**.
+   - (Optional) Import [`db/seed.sql`](file:///c:/Users/DEV/Desktop/kunda/db/seed.sql) for default plans and sample data.
+
+### 2. Configure Environment Variables in cPanel
+In cPanel **Setup Node.js App** (or your `.env` file):
+```env
+# MySQL Connection
+DATABASE_URL=mysql://cpaneluser_dbuser:your_password@localhost:3306/cpaneluser_kunda
+# Or individual variables:
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=cpaneluser_dbuser
+MYSQL_PASSWORD=your_password
+MYSQL_DATABASE=cpaneluser_kunda
+
+# Google Drive Storage & Daily Backups
+GOOGLE_DRIVE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_DRIVE_CLIENT_SECRET=GOCSPX-your-secret
+GOOGLE_DRIVE_REFRESH_TOKEN=1//your-refresh-token
+GOOGLE_DRIVE_FOLDER_ID=your-folder-id
+```
+
+### 3. Automated Daily MySQL Backup to Google Drive (.sql)
+The system includes an automated backup engine that exports `.sql` dumps whenever the database has changed and uploads them to Google Drive:
+- **Historical Retention**: Old backups are **never deleted**; every backup is preserved permanently on Google Drive and in `/backups`.
+- **Change Detection**: Compares table checksums and row counts so duplicate backups are skipped if the database hasn't changed.
+- **Run via cPanel Cron Job (Daily at 02:00 AM)**:
+  ```bash
+  0 2 * * * cd /home/cpaneluser/public_html && /usr/local/bin/node scripts/backup-db.cjs >> backups/cron.log 2>&1
+  ```
+- **Run Manually**:
+  - From CLI: `npm run db:backup` (or `npm run db:backup:force`)
+  - From Admin Portal: **Settings -> Daily MySQL Database Backup -> Trigger Backup (.sql) Now**
+
+---
+
 ## 📄 License & Compliance
 
 © 2026 Kunda Space. All rights reserved. Exclusively for adults aged 18 and older.

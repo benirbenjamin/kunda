@@ -33,6 +33,8 @@ import adminUsersHandler from './api/_routes/admin/users';
 import adminSettingsHandler from './api/_routes/admin/settings';
 import adminModerationHandler from './api/_routes/admin/moderation';
 import adminLedgerHandler from './api/_routes/admin/ledger';
+import adminBackupHandler from './api/_routes/admin/backup';
+import { runDatabaseBackup } from './scripts/backup-db';
 
 dotenv.config();
 
@@ -107,6 +109,7 @@ bindRoute('/api/admin/users', adminUsersHandler);
 bindRoute('/api/admin/settings', adminSettingsHandler);
 bindRoute('/api/admin/moderation', adminModerationHandler);
 bindRoute('/api/admin/ledger', adminLedgerHandler);
+bindRoute('/api/admin/backup', adminBackupHandler);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -119,6 +122,18 @@ app.get('/health', (req, res) => {
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`✨ Kunda Space API Server listening on port ${PORT}`);
+
+    // Schedule automated daily database backup check (runs once every 24 hours)
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    // Initial check 30 seconds after server startup
+    setTimeout(() => {
+      runDatabaseBackup().catch((e: any) => console.warn('Automated startup backup notice:', e?.message));
+    }, 30000);
+
+    // Recurring 24-hour backup cycle
+    setInterval(() => {
+      runDatabaseBackup().catch((e: any) => console.warn('Automated daily backup notice:', e?.message));
+    }, TWENTY_FOUR_HOURS);
   });
 }
 
