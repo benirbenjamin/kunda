@@ -37,7 +37,11 @@ export function getErrorMessage(error: any): string {
   const errData = error.response?.data;
   if (errData) {
     if (typeof errData === 'string') {
-      return errData;
+      const clean = errData.trim();
+      if (clean.includes('FUNCTION_INVOCATION_FAILED')) {
+        return 'Server execution error (FUNCTION_INVOCATION_FAILED). The serverless API encountered an issue.';
+      }
+      return clean;
     }
     if (typeof errData.error === 'string') {
       return errData.error;

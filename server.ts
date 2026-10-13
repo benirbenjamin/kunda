@@ -34,7 +34,7 @@ import adminSettingsHandler from './api/_routes/admin/settings.js';
 import adminModerationHandler from './api/_routes/admin/moderation.js';
 import adminLedgerHandler from './api/_routes/admin/ledger.js';
 import adminBackupHandler from './api/_routes/admin/backup.js';
-import { runDatabaseBackup } from './scripts/backup-db.js';
+import { runDatabaseBackup } from './scripts/backup-db.ts';
 
 dotenv.config();
 

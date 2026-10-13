@@ -17,10 +17,12 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setErrorDetails(null);
     setLoading(true);
 
     try {
@@ -29,16 +31,35 @@ export const Login: React.FC = () => {
         password,
       });
 
-      const data = res.data;
-      if (data.success && data.token) {
+      const data = res?.data;
+      if (data && data.success && data.token) {
         login(data.token, data.user, data.profile);
         navigate('/dashboard/discover');
       } else {
-        const errorMsg = data.error ? getErrorMessage(data.error) : t('auth.loginError');
+        const errorMsg = data?.error ? getErrorMessage(data.error) : t('auth.loginError');
         setError(errorMsg);
+        if (data?.error && typeof data.error === 'object') {
+          setErrorDetails(JSON.stringify(data.error));
+        }
       }
     } catch (err: any) {
-      setError(getErrorMessage(err));
+      console.error('Login submit caught error:', err);
+      const friendlyMsg = getErrorMessage(err);
+      setError(friendlyMsg);
+
+      // Collect technical details for user transparency
+      const status = err?.response?.status;
+      const statusText = err?.response?.statusText;
+      const rawBody = err?.response?.data;
+      const detailStr = [
+        status ? `Status: ${status} ${statusText || ''}` : '',
+        typeof rawBody === 'string' ? rawBody : (rawBody?.error ? JSON.stringify(rawBody.error) : ''),
+        err?.message ? `Details: ${err.message}` : '',
+      ].filter(Boolean).join(' | ');
+
+      if (detailStr) {
+        setErrorDetails(detailStr);
+      }
     } finally {
       setLoading(false);
     }
@@ -56,9 +77,18 @@ export const Login: React.FC = () => {
         </div>
 
         {error && (
-          <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5 text-xs text-red-600 font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{typeof error === 'string' ? error : getErrorMessage(error)}</span>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 space-y-2 animate-in fade-in">
+            <div className="flex items-start gap-2.5 font-semibold">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+              <div className="flex-1">
+                <span>{typeof error === 'string' ? error : getErrorMessage(error)}</span>
+              </div>
+            </div>
+            {errorDetails && (
+              <div className="pt-2 border-t border-red-200/60 font-mono text-[11px] text-red-600/90 break-words max-h-24 overflow-y-auto bg-red-100/40 p-2 rounded-lg">
+                {errorDetails}
+              </div>
+            )}
           </div>
         )}
 

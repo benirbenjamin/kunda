@@ -5,10 +5,18 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
-import { runDatabaseBackup } from '../../../scripts/backup-db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+let runDatabaseBackup: any = null;
+try {
+  // @ts-ignore
+  const backupModule = await import('../../../scripts/backup-db.ts').catch(() => null);
+  if (backupModule) runDatabaseBackup = backupModule.runDatabaseBackup;
+} catch (e) {
+  // Graceful fallback in serverless lambda
+}
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);

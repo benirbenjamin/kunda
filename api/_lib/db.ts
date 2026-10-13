@@ -27,6 +27,9 @@ if (isPostgres) {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
     });
+    pgPool.on('error', (err) => {
+      console.warn('PostgreSQL idle client error, keeping pool alive:', err);
+    });
     console.log('📦 PostgreSQL connection pool initialized.');
   } catch (pgErr) {
     console.warn('⚠️ Could not initialize PostgreSQL pool, falling back to memory store:', pgErr);
