@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "tsx server.ts",
-    "build": "tsc && vite build && esbuild api/index.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
-    "build:api": "esbuild api/index.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
+    "build": "tsc && vite build && esbuild api/_index.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
+    "build:api": "esbuild api/_index.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
     "preview": "vite preview",
     "test": "vitest run",
     "db:migrate": "tsx db/migrate.ts",

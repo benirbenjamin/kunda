@@ -2956,7 +2956,7 @@ async function handler27(req, res) {
   return res.status(405).json({ success: false, error: "Method not allowed" });
 }
 
-// api/index.ts
+// api/_index.ts
 var routes = {
   "auth/login": handler2,
   "auth/register": handler,
