@@ -17,15 +17,30 @@ export interface EmailOptions {
 export function getEmailConfig() {
   const settings = memoryStore.adminSettings;
 
+  const resendApiKey = (settings.get('resend_api_key') as string) || process.env.RESEND_API_KEY || '';
+  const smtpUser = (settings.get('smtp_user') as string) || process.env.SMTP_USER || '';
+  const smtpPass = (settings.get('smtp_pass') as string) || process.env.SMTP_PASS || '';
+
+  let provider = (settings.get('email_provider') as string) || process.env.EMAIL_PROVIDER || '';
+  if (!provider || provider === 'mock') {
+    if (resendApiKey) {
+      provider = 'resend';
+    } else if (smtpUser && smtpPass) {
+      provider = 'smtp';
+    } else {
+      provider = 'mock';
+    }
+  }
+
   return {
-    provider: (settings.get('email_provider') as string) || process.env.EMAIL_PROVIDER || 'mock', // 'resend' | 'smtp' | 'mock'
-    resendApiKey: (settings.get('resend_api_key') as string) || process.env.RESEND_API_KEY || '',
+    provider,
+    resendApiKey,
     resendFromEmail: (settings.get('resend_from_email') as string) || process.env.RESEND_FROM_EMAIL || 'Kunda Space <onboarding@resend.dev>',
     smtpHost: (settings.get('smtp_host') as string) || process.env.SMTP_HOST || 'smtp.gmail.com',
     smtpPort: parseInt((settings.get('smtp_port') as string) || process.env.SMTP_PORT || '587', 10),
     smtpSecure: (settings.get('smtp_secure') as boolean) || process.env.SMTP_SECURE === 'true',
-    smtpUser: (settings.get('smtp_user') as string) || process.env.SMTP_USER || '',
-    smtpPass: (settings.get('smtp_pass') as string) || process.env.SMTP_PASS || '',
+    smtpUser,
+    smtpPass,
     smtpFromEmail: (settings.get('smtp_from_email') as string) || process.env.SMTP_FROM_EMAIL || 'Kunda Space <noreply@kunda.space>',
   };
 }

@@ -158,7 +158,6 @@ export default async function handler(req: any, res: any) {
       success: true,
       token,
       requiresVerification: true,
-      verificationCode, // Returned for instant demo testing
       user: {
         id: userId,
         email: newUser.email,

@@ -489,16 +489,28 @@ async function query(sql, params = []) {
 import nodemailer from "nodemailer";
 function getEmailConfig() {
   const settings = memoryStore.adminSettings;
+  const resendApiKey = settings.get("resend_api_key") || process.env.RESEND_API_KEY || "";
+  const smtpUser = settings.get("smtp_user") || process.env.SMTP_USER || "";
+  const smtpPass = settings.get("smtp_pass") || process.env.SMTP_PASS || "";
+  let provider = settings.get("email_provider") || process.env.EMAIL_PROVIDER || "";
+  if (!provider || provider === "mock") {
+    if (resendApiKey) {
+      provider = "resend";
+    } else if (smtpUser && smtpPass) {
+      provider = "smtp";
+    } else {
+      provider = "mock";
+    }
+  }
   return {
-    provider: settings.get("email_provider") || process.env.EMAIL_PROVIDER || "mock",
-    // 'resend' | 'smtp' | 'mock'
-    resendApiKey: settings.get("resend_api_key") || process.env.RESEND_API_KEY || "",
+    provider,
+    resendApiKey,
     resendFromEmail: settings.get("resend_from_email") || process.env.RESEND_FROM_EMAIL || "Kunda Space <onboarding@resend.dev>",
     smtpHost: settings.get("smtp_host") || process.env.SMTP_HOST || "smtp.gmail.com",
     smtpPort: parseInt(settings.get("smtp_port") || process.env.SMTP_PORT || "587", 10),
     smtpSecure: settings.get("smtp_secure") || process.env.SMTP_SECURE === "true",
-    smtpUser: settings.get("smtp_user") || process.env.SMTP_USER || "",
-    smtpPass: settings.get("smtp_pass") || process.env.SMTP_PASS || "",
+    smtpUser,
+    smtpPass,
     smtpFromEmail: settings.get("smtp_from_email") || process.env.SMTP_FROM_EMAIL || "Kunda Space <noreply@kunda.space>"
   };
 }
@@ -775,8 +787,6 @@ async function handler(req, res) {
       success: true,
       token,
       requiresVerification: true,
-      verificationCode,
-      // Returned for instant demo testing
       user: {
         id: userId,
         email: newUser.email,
