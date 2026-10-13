@@ -125,27 +125,26 @@ export default async function handler(req: any, res: any) {
       repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED,
     });
 
-    // Send verification email via configured provider (Resend or SMTP)
-    const appUrl = process.env.APP_URL || 'http://localhost:5173';
-    try {
-      await sendVerificationEmail(
-        newUser.email,
-        newProfile.displayName,
-        verificationCode,
-        verificationToken,
-        appUrl
-      );
-    } catch (emailErr) {
-      console.warn('Failed to send verification email:', emailErr);
-    }
+    // Send verification email asynchronously without blocking registration response
+    const appUrl = process.env.APP_URL || 'https://kunda.benix.space';
+    sendVerificationEmail(
+      newUser.email,
+      newProfile.displayName,
+      verificationCode,
+      verificationToken,
+      appUrl
+    ).catch((emailErr) => console.warn('Non-blocking verification email error:', emailErr));
 
-    // Also attempt write to PostgreSQL if connected
-    await query(
-      `INSERT INTO users (id, email, password_hash, role, dob, phone, phone_code, preferred_language, email_verified)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
-       ON CONFLICT (email) DO NOTHING`,
-      [userId, newUser.email, passwordHash, 'user', dob, newUser.phone, newUser.phoneCode, newUser.preferredLanguage]
-    );
+    // Non-blocking write to PostgreSQL if connected
+    Promise.race([
+      query(
+        `INSERT INTO users (id, email, password_hash, role, dob, phone, phone_code, preferred_language, email_verified)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
+         ON CONFLICT (email) DO NOTHING`,
+        [userId, newUser.email, passwordHash, 'user', dob, newUser.phone, newUser.phoneCode, newUser.preferredLanguage]
+      ),
+      new Promise((resolve) => setTimeout(resolve, 2000))
+    ]).catch((err) => console.warn('Async DB user insert warning:', err));
 
     // Generate JWT auth session
     const token = generateToken({

@@ -231,8 +231,12 @@ export const RegisterWizard: React.FC = () => {
 
       const data = res?.data;
       if (data && data.success && data.token) {
+        if (data.verificationCode) {
+          sessionStorage.setItem('kunda_pending_code', data.verificationCode);
+        }
         login(data.token, data.user, data.profile);
-        navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
+        const codeParam = data.verificationCode ? `&code=${encodeURIComponent(data.verificationCode)}` : '';
+        navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}${codeParam}`);
       } else {
         const errorMsg = data?.error ? getErrorMessage(data.error) : 'Registration failed. Please check your information.';
         setError(errorMsg);

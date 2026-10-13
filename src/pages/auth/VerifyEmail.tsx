@@ -12,12 +12,15 @@ export const VerifyEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
   const urlToken = searchParams.get('token');
   const urlEmail = searchParams.get('email');
+  const urlCode = searchParams.get('code');
 
   const { t } = useLanguage();
   const { refreshSession } = useAuth();
   const navigate = useNavigate();
 
-  const [code, setCode] = useState<string>('');
+  const [code, setCode] = useState<string>(() => {
+    return urlCode || sessionStorage.getItem('kunda_pending_code') || '';
+  });
   const [email, setEmail] = useState<string>(urlEmail || '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);

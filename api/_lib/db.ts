@@ -112,6 +112,36 @@ function initMemoryStore() {
   memoryStore.wallets.set(adminId, { balanceMinor: 50000, currency: 'RWF' });
   memoryStore.allowances.set(adminId, { initialRemaining: 3, distinctRecipients: [], repliesRemaining: 3 });
 
+  // Super Admin: benirabok@gmail.com
+  const benirAdminId = 'a0000000-0000-0000-0000-000000000002';
+  memoryStore.users.push({
+    id: benirAdminId,
+    email: 'benirabok@gmail.com',
+    passwordHash: '$2a$10$VxvCfWC10b98XDvgnLe7meEg1y9jTvTHU8fHKmRxfuADfVVyjqEZe', // 1202!birthDATE
+    role: 'super_admin',
+    dob: '1995-01-01',
+    phone: '788000000',
+    phoneCode: '+250',
+    preferredLanguage: 'en',
+    emailVerified: true,
+    isSuspended: false,
+    createdAt: new Date().toISOString(),
+  });
+  memoryStore.profiles.push({
+    id: 'p-' + benirAdminId,
+    userId: benirAdminId,
+    displayName: 'Benir (Super Admin)',
+    gender: 'other',
+    interestedIn: 'everyone',
+    country: 'Rwanda',
+    city: 'Kigali',
+    photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'],
+    verifiedBadge: true,
+    profileCompleted: true,
+  });
+  memoryStore.wallets.set(benirAdminId, { balanceMinor: 100000, currency: 'RWF' });
+  memoryStore.allowances.set(benirAdminId, { initialRemaining: 999, distinctRecipients: [], repliesRemaining: 999 });
+
   // Initial business settings
   memoryStore.adminSettings.set('free_initial_messages', 3);
   memoryStore.adminSettings.set('free_distinct_recipients', 3);
