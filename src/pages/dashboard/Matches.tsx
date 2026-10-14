@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '../../components/ui/Button';
-import { Heart, MessageCircle, MapPin, Sparkles } from 'lucide-react';
+import { Heart, MessageCircle, MapPin, Sparkles, CheckCircle2 } from 'lucide-react';
 import { api } from '../../lib/api';
 
 export const Matches: React.FC = () => {
@@ -85,10 +85,23 @@ export const Matches: React.FC = () => {
               <div className="p-4 space-y-3">
                 <p className="text-xs text-slate-500">
                   Seeking:{' '}
-                  <span className="font-semibold text-slate-700">
-                    {m.relationshipIntention?.replace('_', ' ')}
+                  <span className="font-semibold text-slate-700 capitalize">
+                    {m.relationshipIntention?.replace(/_/g, ' ')}
                   </span>
                 </p>
+
+                {m.matchReasons && m.matchReasons.length > 0 && (
+                  <div className="text-[11px] bg-rose-50/60 p-2.5 rounded-xl border border-rose-100 space-y-1">
+                    <span className="font-bold text-rose-950 block">Why you matched:</span>
+                    {m.matchReasons.slice(0, 2).map((r: string, idx: number) => (
+                      <div key={idx} className="flex items-center gap-1.5 text-rose-900">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="truncate">{r}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <Link to={`/dashboard/messages?user=${m.partnerId}`} className="block">
                   <Button variant="primary" size="sm" className="w-full">
                     <MessageCircle className="w-3.5 h-3.5 mr-1.5" />

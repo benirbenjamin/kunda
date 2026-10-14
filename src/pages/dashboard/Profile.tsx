@@ -4,7 +4,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Camera, Check, ShieldCheck, User } from 'lucide-react';
+import { Camera, Check, ShieldCheck, User, Trash2 } from 'lucide-react';
 import { api } from '../../lib/api';
 
 export const Profile: React.FC = () => {
@@ -17,6 +17,7 @@ export const Profile: React.FC = () => {
       : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80']
   );
   const [uploading, setUploading] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
   const [displayName, setDisplayName] = useState(profile?.displayName || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [city, setCity] = useState(profile?.city || 'Kigali');
@@ -25,6 +26,15 @@ export const Profile: React.FC = () => {
   const [intention, setIntention] = useState(profile?.relationshipIntention || 'serious_relationship');
   const [consent, setConsent] = useState(profile?.contactSharingConsent ?? true);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+
+  const handleDeletePhoto = (indexToDelete: number) => {
+    if (photos.length <= 1) {
+      if (!confirm('Are you sure you want to remove your only photo?')) return;
+      setPhotos(['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80']);
+      return;
+    }
+    setPhotos((prev) => prev.filter((_, i) => i !== indexToDelete));
+  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -41,14 +51,11 @@ export const Profile: React.FC = () => {
           mimeType: file.type,
         });
         const data = res.data;
-        if (data.success && data.url) {
-          setPhotos((prev) => [data.url, ...prev.slice(1)]);
-        } else {
-          setPhotos((prev) => [base64, ...prev.slice(1)]);
-        }
+        const newUrl = data.success && data.url ? data.url : base64;
+        setPhotos((prev) => [...prev, newUrl]);
       } catch (err) {
         console.error('Failed to upload photo:', err);
-        setPhotos((prev) => [base64, ...prev.slice(1)]);
+        setPhotos((prev) => [...prev, base64]);
       } finally {
         setUploading(false);
       }
@@ -56,23 +63,30 @@ export const Profile: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    const updated = {
-      ...profile,
-      photos,
-      displayName,
-      bio,
-      city,
-      country,
-      height: Number(height),
-      relationshipIntention: intention,
-      contactSharingConsent: consent,
-    };
-    updateProfile(updated);
-    setSavedMessage('Profile successfully updated!');
-    setTimeout(() => setSavedMessage(null), 3000);
+    setSaving(true);
+    try {
+      const updated = {
+        ...profile,
+        photos,
+        displayName,
+        bio,
+        city,
+        country,
+        height: Number(height),
+        relationshipIntention: intention,
+        contactSharingConsent: consent,
+      };
+      await updateProfile(updated);
+      setSavedMessage('Profile successfully updated!');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -92,34 +106,52 @@ export const Profile: React.FC = () => {
       <form onSubmit={handleSave} className="bg-white rounded-3xl border border-slate-100 shadow-card p-8 space-y-6">
         {/* Profile Photos Preview & Upload */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-            Profile Photographs (Google Drive Storage)
-          </label>
-          <div className="flex items-center gap-4">
-            <div className="relative group">
-              <img
-                src={photos[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'}
-                alt="Primary profile"
-                className="w-24 h-24 rounded-2xl object-cover border-2 border-rose-500 shadow-sm"
-              />
-              <label className="absolute inset-0 bg-black/40 rounded-2xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-[10px] font-bold">
-                <Camera className="w-5 h-5 mb-0.5" />
-                Change
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={uploading} />
-              </label>
-            </div>
-            {photos[1] && (
-              <img
-                src={photos[1]}
-                alt="Secondary profile"
-                className="w-24 h-24 rounded-2xl object-cover border border-slate-200"
-              />
-            )}
-            <label className="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-200 hover:border-rose-300 flex flex-col items-center justify-center text-slate-400 hover:text-rose-500 cursor-pointer transition-colors text-xs font-semibold">
-              <Camera className="w-5 h-5 mb-1" />
-              {uploading ? 'Uploading...' : 'Upload'}
-              <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={uploading} />
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              Profile Photos
             </label>
+            <span className="text-[11px] text-slate-400">Add up to 6 pictures. First photo is primary.</span>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            {photos.map((url, idx) => (
+              <div key={idx} className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
+                <img
+                  src={url}
+                  alt={`Profile ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                {idx === 0 && (
+                  <span className="absolute bottom-1.5 left-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md shadow">
+                    Primary
+                  </span>
+                )}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <button
+                    type="button"
+                    title="Delete photo"
+                    onClick={() => handleDeletePhoto(idx)}
+                    className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors shadow"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {photos.length < 6 && (
+              <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 hover:border-rose-300 flex flex-col items-center justify-center text-slate-400 hover:text-rose-500 cursor-pointer transition-colors text-xs font-semibold bg-slate-50/50">
+                <Camera className="w-5 h-5 mb-1" />
+                <span>{uploading ? 'Uploading...' : '+ Add'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                  disabled={uploading}
+                />
+              </label>
+            )}
           </div>
         </div>
 
@@ -194,7 +226,7 @@ export const Profile: React.FC = () => {
           />
         </div>
 
-        <Button type="submit" className="w-full py-3">
+        <Button type="submit" loading={saving} className="w-full py-3">
           Save Profile Changes
         </Button>
       </form>

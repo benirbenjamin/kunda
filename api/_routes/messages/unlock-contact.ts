@@ -3,7 +3,7 @@
 // =====================================================================
 import crypto from 'crypto';
 import { extractAuthUser } from '../../_lib/auth.js';
-import { memoryStore } from '../../_lib/db.js';
+import { memoryStore, loadAdminSettingsFromDb, query } from '../../_lib/db.js';
 import { debitWallet, getWalletBalance } from '../../_lib/wallet.js';
 import { BUSINESS_CONFIG } from '../../_lib/config.js';
 
@@ -17,6 +17,9 @@ export default async function handler(req: any, res: any) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
+  // Ensure dynamic admin settings are loaded from DB
+  await loadAdminSettingsFromDb();
+
   const { targetUserId } = req.body;
   if (!targetUserId) {
     return res.status(400).json({ success: false, error: 'Target user ID is required' });
@@ -27,8 +30,17 @@ export default async function handler(req: any, res: any) {
   }
 
   // Check if target user exists and is not suspended
-  const targetUser = memoryStore.users.find((u) => u.id === targetUserId);
-  const targetProfile = memoryStore.profiles.find((p) => p.userId === targetUserId);
+  let targetUser = memoryStore.users.find((u) => u.id === targetUserId);
+  let targetProfile = memoryStore.profiles.find((p) => p.userId === targetUserId);
+
+  if (!targetUser) {
+    const uRes = await query('SELECT * FROM users WHERE id = $1', [targetUserId]);
+    if (uRes?.rows?.[0]) targetUser = uRes.rows[0];
+  }
+  if (!targetProfile) {
+    const pRes = await query('SELECT * FROM profiles WHERE user_id = $1', [targetUserId]);
+    if (pRes?.rows?.[0]) targetProfile = pRes.rows[0];
+  }
 
   if (!targetUser || !targetProfile) {
     return res.status(404).json({ success: false, error: 'Target member profile not found' });
@@ -38,12 +50,13 @@ export default async function handler(req: any, res: any) {
     return res.status(403).json({ success: false, error: 'Cannot unlock contact of a restricted member' });
   }
 
+  const hasConsent = targetProfile.contactSharingConsent ?? targetProfile.contact_sharing_consent ?? true;
   // 1. Mandatory Consent Check
-  if (!targetProfile.contactSharingConsent) {
+  if (!hasConsent) {
     return res.status(403).json({
       success: false,
       error: 'CONSENT_REQUIRED',
-      message: `${targetProfile.displayName} has not enabled direct contact sharing on their profile yet. You can ask them respectfully via chat first.`,
+      message: `${targetProfile.displayName || 'Member'} has not enabled direct contact sharing on their profile yet. You can ask them respectfully via chat first.`,
     });
   }
 
@@ -52,12 +65,15 @@ export default async function handler(req: any, res: any) {
     (cu) => cu.requesterId === auth.userId && cu.targetUserId === targetUserId
   );
 
+  const phoneFormatted = `${targetUser.phoneCode || targetUser.phone_code || '+250'} ${targetUser.phone || ''}`.trim();
+  const displayName = targetProfile.displayName || targetProfile.display_name || 'Member';
+
   if (alreadyUnlocked) {
     return res.status(200).json({
       success: true,
       alreadyUnlocked: true,
-      phone: `${targetUser.phoneCode} ${targetUser.phone}`,
-      displayName: targetProfile.displayName,
+      phone: phoneFormatted,
+      displayName,
     });
   }
 

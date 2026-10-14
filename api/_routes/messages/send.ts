@@ -3,7 +3,7 @@
 // =====================================================================
 import crypto from 'crypto';
 import { extractAuthUser } from '../../_lib/auth.js';
-import { memoryStore } from '../../_lib/db.js';
+import { memoryStore, loadAdminSettingsFromDb, query } from '../../_lib/db.js';
 import { checkMessageModeration } from '../../_lib/moderation.js';
 import { debitWallet, getWalletBalance } from '../../_lib/wallet.js';
 import { BUSINESS_CONFIG } from '../../_lib/config.js';
@@ -13,6 +13,9 @@ export default async function handler(req: any, res: any) {
   if (!auth) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
+
+  // Ensure latest dynamic settings from DB are loaded
+  await loadAdminSettingsFromDb();
 
   // --- GET: Fetch message history with partner ---
   if (req.method === 'GET') {
@@ -53,8 +56,22 @@ export default async function handler(req: any, res: any) {
     const isUnlocked = memoryStore.contactUnlocks.some(
       (cu) => cu.requesterId === auth.userId && cu.targetUserId === partnerId
     );
-    const partnerUser = memoryStore.users.find((u) => u.id === partnerId);
-    const partnerProfile = memoryStore.profiles.find((p) => p.userId === partnerId);
+
+    let partnerUser = memoryStore.users.find((u) => u.id === partnerId);
+    let partnerProfile = memoryStore.profiles.find((p) => p.userId === partnerId);
+
+    if (!partnerUser) {
+      const uRes = await query('SELECT * FROM users WHERE id = $1', [partnerId]);
+      if (uRes?.rows?.[0]) partnerUser = uRes.rows[0];
+    }
+    if (!partnerProfile) {
+      const pRes = await query('SELECT * FROM profiles WHERE user_id = $1', [partnerId]);
+      if (pRes?.rows?.[0]) partnerProfile = pRes.rows[0];
+    }
+
+    const contactUnlockPrice = Number(
+      memoryStore.adminSettings.get('contact_unlock_cost') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF
+    );
 
     return res.status(200).json({
       success: true,
@@ -63,8 +80,12 @@ export default async function handler(req: any, res: any) {
       wallet,
       hasActiveSubscription: Boolean(activeSub),
       isContactUnlocked: isUnlocked,
-      partnerPhone: isUnlocked ? `${partnerUser?.phoneCode} ${partnerUser?.phone}` : null,
-      partnerConsentGiven: partnerProfile?.contactSharingConsent || false,
+      contactUnlockPrice,
+      partnerName: partnerProfile?.displayName || partnerProfile?.display_name || partnerUser?.displayName || 'Member',
+      partnerAvatar: (partnerProfile?.photos && partnerProfile.photos[0]) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      partnerCity: partnerProfile?.city || 'Rwanda',
+      partnerPhone: isUnlocked ? `${partnerUser?.phoneCode || partnerUser?.phone_code || '+250'} ${partnerUser?.phone}` : null,
+      partnerConsentGiven: partnerProfile?.contactSharingConsent ?? partnerProfile?.contact_sharing_consent ?? true,
     });
   }
 

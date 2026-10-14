@@ -43,6 +43,9 @@ export function getErrorMessage(error: any): string {
       }
       return clean;
     }
+    if (typeof errData.message === 'string' && errData.message.trim().length > 0) {
+      return errData.message.trim();
+    }
     if (typeof errData.error === 'string') {
       return errData.error;
     }
@@ -58,9 +61,6 @@ export function getErrorMessage(error: any): string {
       } catch {
         return 'An error occurred processing the request.';
       }
-    }
-    if (typeof errData.message === 'string') {
-      return errData.message;
     }
     if (typeof errData.message === 'object' && errData.message !== null) {
       if (typeof errData.message.message === 'string') {

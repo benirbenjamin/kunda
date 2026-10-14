@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useWallet } from '../../contexts/WalletContext';
@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Sparkles,
   Zap,
+  MessageCircle,
 } from 'lucide-react';
 import { api, getErrorMessage } from '../../lib/api';
 
@@ -55,8 +56,23 @@ export const Messages: React.FC = () => {
   const [unlockModalOpen, setUnlockModalOpen] = useState<boolean>(false);
   const [unlockLoading, setUnlockLoading] = useState<boolean>(false);
   const [unlockedPhone, setUnlockedPhone] = useState<string | null>(null);
+  const [contactUnlockPrice, setContactUnlockPrice] = useState<number>(2000);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Fetch subscription plans to synchronize live dynamic contact unlock fee
+  useEffect(() => {
+    api.get('/subscriptions/plans')
+      .then((res) => {
+        if (res.data?.success && Array.isArray(res.data.plans)) {
+          const unlockPlan = res.data.plans.find((p: any) => p.code === 'contact_unlock');
+          if (unlockPlan && typeof unlockPlan.price === 'number') {
+            setContactUnlockPrice(unlockPlan.price);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch conversation threads
   const fetchConversations = async () => {
@@ -93,6 +109,17 @@ export const Messages: React.FC = () => {
           repliesRemaining: data.allowances?.repliesRemaining ?? 3,
           hasActiveSubscription: data.hasActiveSubscription ?? false,
         });
+        if (data.contactUnlockPrice) {
+          setContactUnlockPrice(data.contactUnlockPrice);
+        }
+        if (data.partnerName) {
+          setActivePartnerData((prev: any) => ({
+            ...prev,
+            partnerName: data.partnerName,
+            partnerAvatar: data.partnerAvatar || prev?.partnerAvatar,
+            partnerCity: data.partnerCity || prev?.partnerCity,
+          }));
+        }
         if (data.isContactUnlocked && data.partnerPhone) {
           setUnlockedPhone(data.partnerPhone);
         } else {
@@ -159,7 +186,11 @@ export const Messages: React.FC = () => {
   };
 
   const handleUnlockContact = async () => {
-    if (!selectedPartnerId || !token) return;
+    if (!selectedPartnerId) {
+      alert('Please select a conversation partner first.');
+      return;
+    }
+    if (!token) return;
     setUnlockLoading(true);
 
     try {
@@ -172,11 +203,12 @@ export const Messages: React.FC = () => {
         setUnlockedPhone(data.phone);
         setUnlockModalOpen(false);
         refreshBalance();
+        alert(`🎉 Direct contact phone number revealed: ${data.phone}`);
       } else if (data.error === 'INSUFFICIENT_FUNDS') {
         setUnlockModalOpen(false);
         setIsDepositModalOpen(true);
       } else {
-        alert(data.message || data.error);
+        alert(data.message || data.error || 'Failed to unlock contact.');
       }
     } catch (err: any) {
       const errData = err.response?.data;
@@ -269,44 +301,61 @@ export const Messages: React.FC = () => {
 
         {/* Right: Active Chat Stream */}
         <div className="md:col-span-2 flex flex-col justify-between h-[600px]">
-          {/* Active Partner Chat Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <div className="flex items-center gap-3">
-              <img
-                src={activePartnerData?.partnerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
-                alt={activePartnerData?.partnerName || 'Member'}
-                className="w-10 h-10 rounded-full object-cover"
-              />
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  {activePartnerData?.partnerName || 'Member'}
-                </h3>
-                <span className="text-[11px] text-slate-500">
-                  {activePartnerData?.partnerCity || 'Rwanda'}
-                </span>
+          {!selectedPartnerId ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-4">
+              <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shadow-sm">
+                <MessageCircle className="w-8 h-8" />
               </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-800">No Conversation Selected</h3>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  Select a chat thread from the left or discover new matches to start chatting.
+                </p>
+              </div>
+              <Link to="/dashboard/discover">
+                <Button size="sm">Explore Matches</Button>
+              </Link>
             </div>
-
-            {/* Direct Contact Unlock Button or Unlocked Number */}
-            <div>
-              {unlockedPhone ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{unlockedPhone}</span>
+          ) : (
+            <>
+              {/* Active Partner Chat Header */}
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={activePartnerData?.partnerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
+                    alt={activePartnerData?.partnerName || 'Member'}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {activePartnerData?.partnerName || 'Member'}
+                    </h3>
+                    <span className="text-[11px] text-slate-500">
+                      {activePartnerData?.partnerCity || 'Rwanda'}
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setUnlockModalOpen(true)}
-                  className="text-xs"
-                >
-                  <Lock className="w-3.5 h-3.5 mr-1 text-slate-400" />
-                  Unlock Contact
-                </Button>
-              )}
-            </div>
-          </div>
+
+                {/* Direct Contact Unlock Button or Unlocked Number */}
+                <div>
+                  {unlockedPhone ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>{unlockedPhone}</span>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setUnlockModalOpen(true)}
+                      className="text-xs font-semibold"
+                    >
+                      <Lock className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                      Unlock Contact ({contactUnlockPrice.toLocaleString()} RWF)
+                    </Button>
+                  )}
+                </div>
+              </div>
 
           {/* Moderation Alert Banner (Shown when a contact leak attempt occurs) */}
           {moderationWarning && (
@@ -368,6 +417,8 @@ export const Messages: React.FC = () => {
               <Send className="w-4 h-4" />
             </Button>
           </form>
+            </>
+          )}
         </div>
       </div>
 
@@ -383,10 +434,10 @@ export const Messages: React.FC = () => {
           </div>
           <div className="text-center space-y-1">
             <h4 className="text-base font-bold text-slate-900">
-              Unlock {activePartnerData?.partnerName}'s Phone Number
+              Unlock {activePartnerData?.partnerName || 'Member'}'s Phone Number
             </h4>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Contact unlocking costs <strong>2,000 RWF</strong> from your wallet ledger and requires mutual consent.
+              Contact unlocking costs <strong>{contactUnlockPrice.toLocaleString()} RWF</strong> from your wallet ledger and requires mutual consent.
             </p>
           </div>
 
@@ -397,7 +448,7 @@ export const Messages: React.FC = () => {
             </div>
             <div className="flex justify-between">
               <span>Unlock Fee:</span>
-              <strong className="text-rose-600">2,000 RWF</strong>
+              <strong className="text-rose-600">{contactUnlockPrice.toLocaleString()} RWF</strong>
             </div>
           </div>
 
@@ -406,7 +457,7 @@ export const Messages: React.FC = () => {
             loading={unlockLoading}
             className="w-full py-3"
           >
-            Confirm & Unlock Phone Number
+            Confirm & Unlock Phone Number ({contactUnlockPrice.toLocaleString()} RWF)
           </Button>
         </div>
       </Modal>

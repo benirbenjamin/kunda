@@ -533,12 +533,20 @@ export async function saveAdminSettingToDb(key: string, value: any): Promise<boo
       );
       return true;
     } else if (mysqlPool) {
-      await mysqlPool.query(
-        `INSERT INTO \`admin_settings\` (\`key\`, \`value\`)
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`), \`updated_at\` = CURRENT_TIMESTAMP`,
-        [key, jsonVal]
-      );
+      try {
+        await mysqlPool.query(
+          `INSERT INTO \`admin_settings\` (\`key\`, \`value\`)
+           VALUES (?, ?)
+           ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
+          [key, jsonVal]
+        );
+      } catch (insertErr) {
+        // Fallback for MySQL / MariaDB compatibility
+        await mysqlPool.query(
+          `REPLACE INTO \`admin_settings\` (\`key\`, \`value\`) VALUES (?, ?)`,
+          [key, jsonVal]
+        );
+      }
       return true;
     }
   } catch (err) {

@@ -21,6 +21,8 @@ import {
   PlayCircle,
   UploadCloud,
   BookOpen,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 import { api, getErrorMessage } from '../../lib/api';
@@ -587,27 +589,39 @@ export const RegisterWizard: React.FC = () => {
               <p className="text-xs text-slate-500 mt-1">{t('wizard.photosNotice')}</p>
             </div>
 
-            {/* Primary Photo Preview & Google Drive Upload */}
+            {/* Primary Photo Preview & Upload */}
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 {t('wizard.primaryPhoto')}
               </label>
               <div className="flex items-center gap-4">
-                <img
-                  src={formData.primaryPhoto}
-                  alt="Primary profile preview"
-                  className="w-20 h-20 rounded-2xl object-cover border-2 border-rose-500 shadow-sm"
-                />
+                <div className="relative group shrink-0">
+                  <img
+                    src={formData.primaryPhoto}
+                    alt="Primary profile preview"
+                    className="w-20 h-20 rounded-2xl object-cover border-2 border-rose-500 shadow-sm"
+                  />
+                  {formData.primaryPhoto && !formData.primaryPhoto.includes('photo-1534528741775-53994a69daeb') && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, primaryPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80' })}
+                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 shadow hover:bg-red-600 transition-colors"
+                      title="Delete uploaded photo"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
                 <div className="flex-1 space-y-2">
                   <Input
                     value={formData.primaryPhoto}
                     onChange={(e) => setFormData({ ...formData, primaryPhoto: e.target.value })}
-                    placeholder="Image URL or upload file to Google Drive below"
+                    placeholder="Enter photo URL or choose a file below"
                   />
                   <div className="flex items-center gap-2">
                     <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all">
                       <UploadCloud className="w-3.5 h-3.5" />
-                      <span>{uploadingPhoto ? 'Uploading to Drive...' : 'Upload Image (Google Drive)'}</span>
+                      <span>{uploadingPhoto ? 'Uploading photo...' : 'Choose Photo File'}</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -616,7 +630,7 @@ export const RegisterWizard: React.FC = () => {
                         disabled={uploadingPhoto}
                       />
                     </label>
-                    <span className="text-[10px] text-slate-400">Stored via Google Drive Refresh Token</span>
+                    <span className="text-[10px] text-slate-400">JPG, PNG or WEBP up to 10MB</span>
                   </div>
                 </div>
               </div>

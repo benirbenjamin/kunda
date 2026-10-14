@@ -4,6 +4,7 @@
 import crypto from 'crypto';
 import { extractAuthUser } from '../../_lib/auth.js';
 import { memoryStore } from '../../_lib/db.js';
+import { calculateCompatibility } from '../../_lib/matching.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -79,11 +80,50 @@ export default async function handler(req: any, res: any) {
     let matchId = existingMatch?.id;
     if (!existingMatch) {
       matchId = crypto.randomUUID();
+
+      const userP = memoryStore.profiles.find((p) => p.userId === auth.userId);
+      const userU = memoryStore.users.find((u) => u.id === auth.userId);
+      const targetP = memoryStore.profiles.find((p) => p.userId === targetUserId);
+      const targetU = memoryStore.users.find((u) => u.id === targetUserId);
+
+      let realScore = 85;
+      if (userP && targetP) {
+        const comp = calculateCompatibility(
+          {
+            id: userP.id,
+            userId: auth.userId,
+            displayName: userP.displayName,
+            gender: userP.gender,
+            interestedIn: userP.interestedIn,
+            country: userP.country,
+            city: userP.city,
+            dob: userU?.dob || '1995-01-01',
+            relationshipIntention: userP.relationshipIntention,
+            languages: userP.languages,
+            interests: userP.interests,
+          },
+          {
+            id: targetP.id,
+            userId: targetUserId,
+            displayName: targetP.displayName,
+            gender: targetP.gender,
+            interestedIn: targetP.interestedIn,
+            country: targetP.country,
+            city: targetP.city,
+            dob: targetU?.dob || '1995-01-01',
+            relationshipIntention: targetP.relationshipIntention,
+            languages: targetP.languages,
+            interests: targetP.interests,
+          }
+        );
+        realScore = comp.score;
+      }
+
       memoryStore.matches.unshift({
         id: matchId,
         user1Id: auth.userId,
         user2Id: targetUserId,
-        compatibilityScore: 92,
+        compatibilityScore: realScore,
         createdAt: new Date().toISOString(),
       });
 

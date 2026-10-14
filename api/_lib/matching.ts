@@ -90,35 +90,40 @@ export function calculateCompatibility(
 
   // 1. Relationship Intention (25%)
   let intentionScore = 50; // default baseline
-  if (user.relationshipIntention === candidate.relationshipIntention) {
-    intentionScore = 100;
-    reasons.push(`Both seeking ${user.relationshipIntention.replace('_', ' ')}`);
-  } else if (
-    (user.relationshipIntention === 'serious_relationship' && candidate.relationshipIntention === 'marriage') ||
-    (user.relationshipIntention === 'marriage' && candidate.relationshipIntention === 'serious_relationship')
-  ) {
-    intentionScore = 85;
-    reasons.push('Highly aligned long-term relationship commitment');
+  if (user.relationshipIntention && candidate.relationshipIntention) {
+    if (user.relationshipIntention === candidate.relationshipIntention) {
+      intentionScore = 100;
+      const formatted = user.relationshipIntention.replace(/_/g, ' ');
+      reasons.push(`Both looking for a ${formatted}`);
+    } else if (
+      (user.relationshipIntention === 'serious_relationship' && candidate.relationshipIntention === 'marriage') ||
+      (user.relationshipIntention === 'marriage' && candidate.relationshipIntention === 'serious_relationship')
+    ) {
+      intentionScore = 85;
+      reasons.push('Compatible long-term relationship commitment');
+    }
   }
 
   // 2. Age Preference (20%)
-  const candidateAge = calculateAge(candidate.dob);
-  const minAge = user.minAgePref || 20;
-  const maxAge = user.maxAgePref || 50;
-  let ageScore = 50;
+  let ageScore = 60;
+  if (candidate.dob) {
+    const candidateAge = calculateAge(candidate.dob);
+    const minAge = user.minAgePref || 18;
+    const maxAge = user.maxAgePref || 60;
 
-  if (candidateAge >= minAge && candidateAge <= maxAge) {
-    ageScore = 100;
-    reasons.push(`Age ${candidateAge} falls inside your preferred range`);
-  } else {
-    const diff = Math.min(Math.abs(candidateAge - minAge), Math.abs(candidateAge - maxAge));
-    ageScore = Math.max(10, 100 - diff * 15);
+    if (candidateAge >= minAge && candidateAge <= maxAge) {
+      ageScore = 100;
+      reasons.push(`Age (${candidateAge}) matches your preferred range`);
+    } else {
+      const diff = Math.min(Math.abs(candidateAge - minAge), Math.abs(candidateAge - maxAge));
+      ageScore = Math.max(20, 100 - diff * 10);
+    }
   }
 
   // 3. Location (15%)
   let locationScore = 40;
-  if (user.country.toLowerCase() === candidate.country.toLowerCase()) {
-    if (user.city.toLowerCase() === candidate.city.toLowerCase()) {
+  if (user.country && candidate.country && user.country.toLowerCase() === candidate.country.toLowerCase()) {
+    if (user.city && candidate.city && user.city.toLowerCase() === candidate.city.toLowerCase()) {
       locationScore = 100;
       reasons.push(`Both based in ${user.city}, ${user.country}`);
     } else {
@@ -127,27 +132,30 @@ export function calculateCompatibility(
     }
   } else if (user.datingScope === 'international' || candidate.datingScope === 'international') {
     locationScore = 70;
-    reasons.push('Open to international connections');
+    reasons.push('Open to international dating');
   }
 
   // 4. Shared Interests (15%)
-  const userInterests = user.interests || [];
-  const candidateInterests = candidate.interests || [];
+  const userInterests = Array.isArray(user.interests) ? user.interests : [];
+  const candidateInterests = Array.isArray(candidate.interests) ? candidate.interests : [];
   const sharedInterests = userInterests.filter((i) => candidateInterests.includes(i));
   let interestsScore = 50;
-  if (sharedInterests.length >= 3) {
-    interestsScore = 100;
-    reasons.push(`Shares ${sharedInterests.length} common interests: ${sharedInterests.slice(0, 2).join(', ')}`);
-  } else if (sharedInterests.length > 0) {
-    interestsScore = 70 + sharedInterests.length * 10;
-    reasons.push(`Shares ${sharedInterests.length} interest: ${sharedInterests[0]}`);
+
+  if (sharedInterests.length > 0) {
+    interestsScore = Math.min(100, 60 + sharedInterests.length * 15);
+    if (sharedInterests.length === 1) {
+      reasons.push(`Shared passion for ${sharedInterests[0]}`);
+    } else {
+      reasons.push(`Shared interests: ${sharedInterests.slice(0, 3).join(', ')}`);
+    }
   }
 
   // 5. Language Compatibility (10%)
-  const userLanguages = user.languages || ['English'];
-  const candidateLanguages = candidate.languages || ['English'];
+  const userLanguages = Array.isArray(user.languages) ? user.languages : [];
+  const candidateLanguages = Array.isArray(candidate.languages) ? candidate.languages : [];
   const sharedLanguages = userLanguages.filter((l) => candidateLanguages.includes(l));
-  let languagesScore = 50;
+  let languagesScore = 60;
+
   if (sharedLanguages.length > 0) {
     languagesScore = 100;
     reasons.push(`Both speak ${sharedLanguages.join(' & ')}`);
@@ -158,8 +166,12 @@ export function calculateCompatibility(
   if (user.childrenStatus && candidate.childrenStatus) {
     if (user.childrenStatus === candidate.childrenStatus) {
       lifestyleScore = 100;
-      reasons.push('Compatible family and future goals');
+      reasons.push('Compatible family and future aspirations');
     }
+  }
+
+  if (reasons.length === 0) {
+    reasons.push('Mutual interest in genuine communication');
   }
 
   // Weighted sum
@@ -171,7 +183,7 @@ export function calculateCompatibility(
     interestsScore * weights.INTERESTS +
     languagesScore * weights.LANGUAGE +
     lifestyleScore * weights.LIFESTYLE +
-    80 * weights.OTHER
+    75 * weights.OTHER
   );
 
   // Clamped strictly between 0 and 100

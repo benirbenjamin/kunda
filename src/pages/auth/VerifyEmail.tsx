@@ -57,6 +57,33 @@ export const VerifyEmail: React.FC = () => {
     }
   };
 
+  const [resending, setResending] = useState<boolean>(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
+
+  const handleResendCode = async () => {
+    if (!email.trim()) {
+      setError('Please provide your email address to resend confirmation code.');
+      return;
+    }
+    setResending(true);
+    setResendStatus(null);
+    try {
+      const res = await api.post('/auth/verify-email', {
+        email: email.trim(),
+        action: 'resend',
+      });
+      if (res.data?.success) {
+        setResendStatus(res.data.message || 'A fresh code has been sent to your email.');
+      } else {
+        setError(res.data?.error || 'Failed to resend confirmation code.');
+      }
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-card p-8 sm:p-10 space-y-8 animate-in fade-in zoom-in-95">
@@ -66,9 +93,15 @@ export const VerifyEmail: React.FC = () => {
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Verify Your Email</h1>
           <p className="text-xs text-slate-500 leading-relaxed">
-            We sent a 6-digit confirmation code to your email inbox via Resend / SMTP. Enter it below to activate your account.
+            We sent a 6-digit confirmation code to your email inbox. Enter it below to activate your account.
           </p>
         </div>
+
+        {resendStatus && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-semibold text-center">
+            {resendStatus}
+          </div>
+        )}
 
         {error && (
           <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5 text-xs text-red-600 font-medium">
@@ -117,6 +150,18 @@ export const VerifyEmail: React.FC = () => {
                 placeholder="123456"
                 className="w-full text-center text-2xl font-black tracking-widest px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:border-rose-500 focus:bg-white transition-all"
               />
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-slate-500">Didn't receive the email?</span>
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={resending}
+                className="font-bold text-rose-600 hover:text-rose-700 underline disabled:opacity-50"
+              >
+                {resending ? 'Sending...' : 'Resend Code'}
+              </button>
             </div>
 
             <Button type="submit" loading={loading} className="w-full py-3 shadow-md shadow-rose-200">

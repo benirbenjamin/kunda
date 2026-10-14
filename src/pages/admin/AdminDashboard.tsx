@@ -23,7 +23,7 @@ import {
   HardDrive,
   Eye,
 } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api, getErrorMessage } from '../../lib/api';
 
 export const AdminDashboard: React.FC = () => {
   const { token, isAdmin } = useAuth();
@@ -37,6 +37,11 @@ export const AdminDashboard: React.FC = () => {
   const [tutorials, setTutorials] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Form submit loading states
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [adjustLoading, setAdjustLoading] = useState(false);
+  const [tutSaving, setTutSaving] = useState(false);
 
   // Manual Adjustment Modal
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
@@ -146,29 +151,65 @@ export const AdminDashboard: React.FC = () => {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/admin/settings', settings);
-    alert('Business settings, email credentials, and Google Drive configs updated successfully!');
+    try {
+      setSettingsSaving(true);
+      const res = await api.post('/admin/settings', settings);
+      if (res.data?.success) {
+        alert('Platform settings, pricing, email credentials, and configs updated successfully and saved to database!');
+        fetchAdminData();
+      } else {
+        alert(res.data?.error || 'Failed to save settings.');
+      }
+    } catch (err: any) {
+      alert(getErrorMessage(err));
+    } finally {
+      setSettingsSaving(false);
+    }
   };
 
   const handleManualCredit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/admin/ledger', {
-      targetUserId: adjustUserId,
-      amountMinor: adjustAmount,
-      reason: adjustReason,
-    });
-    setAdjustModalOpen(false);
-    fetchAdminData();
+    try {
+      setAdjustLoading(true);
+      const res = await api.post('/admin/ledger', {
+        targetUserId: adjustUserId,
+        amountMinor: adjustAmount,
+        reason: adjustReason,
+      });
+      if (res.data?.success) {
+        alert('Credit successfully applied!');
+        setAdjustModalOpen(false);
+        fetchAdminData();
+      } else {
+        alert(res.data?.error || 'Failed to apply credit');
+      }
+    } catch (err: any) {
+      alert(getErrorMessage(err));
+    } finally {
+      setAdjustLoading(false);
+    }
   };
 
   const handleCreateTutorial = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/tutorials', {
-      action: 'create',
-      ...tutForm,
-    });
-    setTutModalOpen(false);
-    fetchAdminData();
+    try {
+      setTutSaving(true);
+      const res = await api.post('/tutorials', {
+        action: 'create',
+        ...tutForm,
+      });
+      if (res.data?.success) {
+        alert('Tutorial published successfully!');
+        setTutModalOpen(false);
+        fetchAdminData();
+      } else {
+        alert(res.data?.error || 'Failed to publish tutorial');
+      }
+    } catch (err: any) {
+      alert(getErrorMessage(err));
+    } finally {
+      setTutSaving(false);
+    }
   };
 
   const handleDeleteTutorial = async (tutorialId: string) => {
@@ -645,7 +686,7 @@ export const AdminDashboard: React.FC = () => {
             )}
           </div>
 
-          <Button type="submit" className="w-full py-3">
+          <Button type="submit" loading={settingsSaving} className="w-full py-3">
             Save All Platform Settings
           </Button>
         </form>
@@ -757,7 +798,7 @@ export const AdminDashboard: React.FC = () => {
             required
           />
 
-          <Button type="submit" className="w-full">
+          <Button type="submit" loading={adjustLoading} className="w-full">
             Authorize & Execute Credit
           </Button>
         </form>
@@ -825,7 +866,7 @@ export const AdminDashboard: React.FC = () => {
             </select>
           </div>
 
-          <Button type="submit" className="w-full">
+          <Button type="submit" loading={tutSaving} className="w-full">
             Publish Tutorial to Users
           </Button>
         </form>

@@ -2,7 +2,7 @@
 // KUNDA SPACE: DYNAMIC EMAIL SERVICE (Resend, SMTP & Mock)
 // =====================================================================
 import nodemailer from 'nodemailer';
-import { memoryStore } from './db.js';
+import { memoryStore, loadAdminSettingsFromDb } from './db.js';
 
 export interface EmailOptions {
   to: string;
@@ -49,7 +49,11 @@ export function getEmailConfig() {
  * Master send email function
  */
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  // Sync latest admin settings from database
+  await loadAdminSettingsFromDb();
   const config = getEmailConfig();
+
+  console.log(`📧 [EMAIL SENDING] Provider: ${config.provider} | To: ${options.to} | Subject: "${options.subject}"`);
 
   // 1. Resend API
   if (config.provider === 'resend' && config.resendApiKey) {
@@ -71,25 +75,36 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 
       const data = await response.json();
       if (response.ok && data.id) {
+        console.log(`✅ [RESEND SUCCESS] Sent to ${options.to}, messageId: ${data.id}`);
         return { success: true, messageId: data.id };
       }
-      return { success: false, error: data.message || 'Resend API failed' };
+      console.warn('⚠️ [RESEND FAILED]:', data);
+      // If Resend failed (e.g. unverified sender domain), try SMTP if configured
+      if (!config.smtpUser || !config.smtpPass) {
+        return { success: false, error: data.message || 'Resend API failed' };
+      }
+      console.log('🔄 Attempting fallback to SMTP transport...');
     } catch (err: any) {
       console.error('Resend delivery error:', err);
-      return { success: false, error: err.message };
+      if (!config.smtpUser || !config.smtpPass) {
+        return { success: false, error: err.message };
+      }
     }
   }
 
   // 2. SMTP Transport (nodemailer)
-  if (config.provider === 'smtp' && config.smtpHost && config.smtpUser) {
+  if ((config.provider === 'smtp' || (config.smtpUser && config.smtpPass)) && config.smtpHost && config.smtpUser) {
     try {
       const transporter = nodemailer.createTransport({
         host: config.smtpHost,
         port: config.smtpPort,
-        secure: config.smtpSecure,
-        connectionTimeout: 4000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
+        secure: config.smtpPort === 465,
+        tls: {
+          rejectUnauthorized: false,
+        },
+        connectionTimeout: 8000,
+        greetingTimeout: 6000,
+        socketTimeout: 8000,
         auth: {
           user: config.smtpUser,
           pass: config.smtpPass,
@@ -97,7 +112,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       });
 
       const sendPromise = transporter.sendMail({
-        from: config.smtpFromEmail,
+        from: config.smtpFromEmail || `Kunda Space <${config.smtpUser}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -105,14 +120,15 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       });
 
       const timeoutPromise = new Promise<{ messageId?: string }>((_, reject) =>
-        setTimeout(() => reject(new Error('SMTP timeout exceeded (4s)')), 4500)
+        setTimeout(() => reject(new Error('SMTP timeout exceeded (8s)')), 8500)
       );
 
       const info = await Promise.race([sendPromise, timeoutPromise]);
+      console.log(`✅ [SMTP SUCCESS] Sent to ${options.to}, messageId: ${info?.messageId}`);
       return { success: true, messageId: info?.messageId || 'sent' };
     } catch (err: any) {
-      console.warn('SMTP delivery error / timeout:', err?.message || err);
-      // Fall through to mock log so process doesn't fail
+      console.warn('⚠️ SMTP delivery error:', err?.message || err);
+      return { success: false, error: `SMTP delivery error: ${err?.message || err}` };
     }
   }
 

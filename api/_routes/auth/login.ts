@@ -85,6 +85,19 @@ export default async function handler(req: any, res: any) {
       return res.status(401).json({ success: false, error: 'Invalid credentials. Please verify your email and password.' });
     }
 
+    // Require email verification: Unverified users cannot login
+    const isEmailVerified = Boolean(user.emailVerified ?? user.email_verified);
+    const isAdmin = user.role === 'super_admin' || user.role === 'admin';
+    if (!isEmailVerified && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'EMAIL_NOT_VERIFIED',
+        message: 'Your email address is not verified yet. Please enter the confirmation code sent to your email to activate your account.',
+        email: user.email,
+        requiresVerification: true,
+      });
+    }
+
     // Lookup associated profile
     let profile = memoryStore.profiles.find((p) => p.userId === user.id);
     if (!profile) {

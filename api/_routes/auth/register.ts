@@ -125,15 +125,25 @@ export default async function handler(req: any, res: any) {
       repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED,
     });
 
-    // Send verification email asynchronously without blocking registration response
-    const appUrl = process.env.APP_URL || 'https://kunda.benix.space';
-    sendVerificationEmail(
-      newUser.email,
-      newProfile.displayName,
-      verificationCode,
-      verificationToken,
-      appUrl
-    ).catch((emailErr) => console.warn('Non-blocking verification email error:', emailErr));
+    // Send verification email before response so serverless function does not terminate prematurely
+    const proto = (req.headers && req.headers['x-forwarded-proto']) || 'https';
+    const host = (req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || 'kunda-rose.vercel.app';
+    const appUrl = `${proto}://${host}`;
+
+    try {
+      await Promise.race([
+        sendVerificationEmail(
+          newUser.email,
+          newProfile.displayName,
+          verificationCode,
+          verificationToken,
+          appUrl
+        ),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Email dispatch timeout (8s)')), 8500))
+      ]);
+    } catch (emailErr) {
+      console.warn('⚠️ Verification email dispatch notice:', emailErr);
+    }
 
     // Non-blocking write to PostgreSQL if connected
     Promise.race([

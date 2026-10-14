@@ -560,12 +560,19 @@ async function saveAdminSettingToDb(key, value) {
       );
       return true;
     } else if (mysqlPool) {
-      await mysqlPool.query(
-        `INSERT INTO \`admin_settings\` (\`key\`, \`value\`)
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`), \`updated_at\` = CURRENT_TIMESTAMP`,
-        [key, jsonVal]
-      );
+      try {
+        await mysqlPool.query(
+          `INSERT INTO \`admin_settings\` (\`key\`, \`value\`)
+           VALUES (?, ?)
+           ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
+          [key, jsonVal]
+        );
+      } catch (insertErr) {
+        await mysqlPool.query(
+          `REPLACE INTO \`admin_settings\` (\`key\`, \`value\`) VALUES (?, ?)`,
+          [key, jsonVal]
+        );
+      }
       return true;
     }
   } catch (err) {
@@ -609,7 +616,9 @@ function getEmailConfig() {
   };
 }
 async function sendEmail(options) {
+  await loadAdminSettingsFromDb();
   const config = getEmailConfig();
+  console.log(`\u{1F4E7} [EMAIL SENDING] Provider: ${config.provider} | To: ${options.to} | Subject: "${options.subject}"`);
   if (config.provider === "resend" && config.resendApiKey) {
     try {
       const response = await fetch("https://api.resend.com/emails", {
@@ -628,42 +637,54 @@ async function sendEmail(options) {
       });
       const data = await response.json();
       if (response.ok && data.id) {
+        console.log(`\u2705 [RESEND SUCCESS] Sent to ${options.to}, messageId: ${data.id}`);
         return { success: true, messageId: data.id };
       }
-      return { success: false, error: data.message || "Resend API failed" };
+      console.warn("\u26A0\uFE0F [RESEND FAILED]:", data);
+      if (!config.smtpUser || !config.smtpPass) {
+        return { success: false, error: data.message || "Resend API failed" };
+      }
+      console.log("\u{1F504} Attempting fallback to SMTP transport...");
     } catch (err) {
       console.error("Resend delivery error:", err);
-      return { success: false, error: err.message };
+      if (!config.smtpUser || !config.smtpPass) {
+        return { success: false, error: err.message };
+      }
     }
   }
-  if (config.provider === "smtp" && config.smtpHost && config.smtpUser) {
+  if ((config.provider === "smtp" || config.smtpUser && config.smtpPass) && config.smtpHost && config.smtpUser) {
     try {
       const transporter = nodemailer.createTransport({
         host: config.smtpHost,
         port: config.smtpPort,
-        secure: config.smtpSecure,
-        connectionTimeout: 4e3,
-        greetingTimeout: 3e3,
-        socketTimeout: 5e3,
+        secure: config.smtpPort === 465,
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 8e3,
+        greetingTimeout: 6e3,
+        socketTimeout: 8e3,
         auth: {
           user: config.smtpUser,
           pass: config.smtpPass
         }
       });
       const sendPromise = transporter.sendMail({
-        from: config.smtpFromEmail,
+        from: config.smtpFromEmail || `Kunda Space <${config.smtpUser}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
         text: options.text
       });
       const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error("SMTP timeout exceeded (4s)")), 4500)
+        (_, reject) => setTimeout(() => reject(new Error("SMTP timeout exceeded (8s)")), 8500)
       );
       const info = await Promise.race([sendPromise, timeoutPromise]);
+      console.log(`\u2705 [SMTP SUCCESS] Sent to ${options.to}, messageId: ${info?.messageId}`);
       return { success: true, messageId: info?.messageId || "sent" };
     } catch (err) {
-      console.warn("SMTP delivery error / timeout:", err?.message || err);
+      console.warn("\u26A0\uFE0F SMTP delivery error:", err?.message || err);
+      return { success: false, error: `SMTP delivery error: ${err?.message || err}` };
     }
   }
   console.log(`
@@ -854,14 +875,23 @@ async function handler(req, res) {
       distinctRecipients: [],
       repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED
     });
-    const appUrl = process.env.APP_URL || "https://kunda.benix.space";
-    sendVerificationEmail(
-      newUser.email,
-      newProfile.displayName,
-      verificationCode,
-      verificationToken,
-      appUrl
-    ).catch((emailErr) => console.warn("Non-blocking verification email error:", emailErr));
+    const proto = req.headers && req.headers["x-forwarded-proto"] || "https";
+    const host = req.headers && (req.headers["x-forwarded-host"] || req.headers.host) || "kunda-rose.vercel.app";
+    const appUrl = `${proto}://${host}`;
+    try {
+      await Promise.race([
+        sendVerificationEmail(
+          newUser.email,
+          newProfile.displayName,
+          verificationCode,
+          verificationToken,
+          appUrl
+        ),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Email dispatch timeout (8s)")), 8500))
+      ]);
+    } catch (emailErr) {
+      console.warn("\u26A0\uFE0F Verification email dispatch notice:", emailErr);
+    }
     Promise.race([
       query(
         `INSERT INTO users (id, email, password_hash, role, dob, phone, phone_code, preferred_language, email_verified)
@@ -962,6 +992,17 @@ async function handler2(req, res) {
     }
     if (!isValid) {
       return res.status(401).json({ success: false, error: "Invalid credentials. Please verify your email and password." });
+    }
+    const isEmailVerified = Boolean(user.emailVerified ?? user.email_verified);
+    const isAdmin = user.role === "super_admin" || user.role === "admin";
+    if (!isEmailVerified && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: "EMAIL_NOT_VERIFIED",
+        message: "Your email address is not verified yet. Please enter the confirmation code sent to your email to activate your account.",
+        email: user.email,
+        requiresVerification: true
+      });
     }
     let profile = memoryStore.profiles.find((p) => p.userId === user.id);
     if (!profile) {
@@ -1180,12 +1221,13 @@ async function handler3(req, res) {
 }
 
 // api/_routes/auth/verify-email.ts
+import crypto3 from "crypto";
 async function handler4(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
   try {
-    const { email, code, token } = req.body || {};
+    const { email, code, token, action } = req.body || {};
     if (!email && !token) {
       return res.status(400).json({ success: false, error: "Email address or verification token is required" });
     }
@@ -1195,10 +1237,53 @@ async function handler4(req, res) {
     } else if (email) {
       user = memoryStore.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     }
+    if (!user && email) {
+      const uRes = await query("SELECT * FROM users WHERE LOWER(email) = LOWER($1)", [email]);
+      if (uRes && uRes.rows && uRes.rows.length > 0) {
+        user = uRes.rows[0];
+      }
+    }
     if (!user) {
       return res.status(404).json({ success: false, error: "User account not found" });
     }
-    if (user.emailVerified) {
+    if (action === "resend") {
+      const isAlreadyVerified = Boolean(user.emailVerified ?? user.email_verified);
+      if (isAlreadyVerified) {
+        return res.status(200).json({ success: true, message: "Your account email is already verified. You can log in." });
+      }
+      const newCode = Math.floor(1e5 + Math.random() * 9e5).toString();
+      const newToken = crypto3.randomBytes(32).toString("hex");
+      user.verificationCode = newCode;
+      user.verificationToken = newToken;
+      user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3).toISOString();
+      let profile = memoryStore.profiles.find((p) => p.userId === user.id);
+      if (!profile) {
+        const pRes = await query("SELECT * FROM profiles WHERE user_id = $1", [user.id]);
+        if (pRes?.rows?.[0]) profile = pRes.rows[0];
+      }
+      const proto = req.headers && req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers && (req.headers["x-forwarded-host"] || req.headers.host) || "kunda-rose.vercel.app";
+      const appUrl = `${proto}://${host}`;
+      try {
+        await Promise.race([
+          sendVerificationEmail(
+            user.email,
+            profile?.displayName || profile?.display_name || "Member",
+            newCode,
+            newToken,
+            appUrl
+          ),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Email dispatch timeout")), 8e3))
+        ]);
+      } catch (sendErr) {
+        console.warn("Resend verification email notice:", sendErr);
+      }
+      return res.status(200).json({
+        success: true,
+        message: "A fresh 6-digit confirmation code has been dispatched to your email inbox."
+      });
+    }
+    if (user.emailVerified || user.email_verified) {
       return res.status(200).json({ success: true, message: "Email is already verified." });
     }
     const isCodeMatch = code && user.verificationCode === code.toString().trim();
@@ -1224,7 +1309,7 @@ async function handler4(req, res) {
 }
 
 // api/_routes/auth/forgot-password.ts
-import crypto3 from "crypto";
+import crypto4 from "crypto";
 async function handler5(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -1238,7 +1323,7 @@ async function handler5(req, res) {
     const user = memoryStore.users.find((u) => u.email.toLowerCase() === normalizedEmail);
     if (user) {
       const resetCode = Math.floor(1e5 + Math.random() * 9e5).toString();
-      const resetToken = crypto3.randomBytes(32).toString("hex");
+      const resetToken = crypto4.randomBytes(32).toString("hex");
       user.resetCode = resetCode;
       user.resetToken = resetToken;
       user.resetExpiresAt = new Date(Date.now() + 60 * 60 * 1e3).toISOString();
@@ -1459,7 +1544,7 @@ async function handler7(req, res) {
 }
 
 // api/_routes/tutorials/index.ts
-import crypto4 from "crypto";
+import crypto5 from "crypto";
 async function handler8(req, res) {
   if (req.method === "GET") {
     const stepTag = req.query?.step;
@@ -1482,7 +1567,7 @@ async function handler8(req, res) {
     const { action, tutorialId, title_en, title_rw, title_fr, content_en, content_rw, content_fr, videoUrl, imageUrl, stepTag, displayOrder, isActive } = req.body;
     if (action === "create") {
       const newTutorial = {
-        id: crypto4.randomUUID(),
+        id: crypto5.randomUUID(),
         title_en: title_en || "Tutorial Title",
         title_rw: title_rw || title_en || "Umutwe w'inyoborabumenyi",
         title_fr: title_fr || title_en || "Titre du Tutoriel",
@@ -1562,27 +1647,32 @@ function calculateCompatibility(user, candidate) {
   }
   const reasons = [];
   let intentionScore = 50;
-  if (user.relationshipIntention === candidate.relationshipIntention) {
-    intentionScore = 100;
-    reasons.push(`Both seeking ${user.relationshipIntention.replace("_", " ")}`);
-  } else if (user.relationshipIntention === "serious_relationship" && candidate.relationshipIntention === "marriage" || user.relationshipIntention === "marriage" && candidate.relationshipIntention === "serious_relationship") {
-    intentionScore = 85;
-    reasons.push("Highly aligned long-term relationship commitment");
+  if (user.relationshipIntention && candidate.relationshipIntention) {
+    if (user.relationshipIntention === candidate.relationshipIntention) {
+      intentionScore = 100;
+      const formatted = user.relationshipIntention.replace(/_/g, " ");
+      reasons.push(`Both looking for a ${formatted}`);
+    } else if (user.relationshipIntention === "serious_relationship" && candidate.relationshipIntention === "marriage" || user.relationshipIntention === "marriage" && candidate.relationshipIntention === "serious_relationship") {
+      intentionScore = 85;
+      reasons.push("Compatible long-term relationship commitment");
+    }
   }
-  const candidateAge = calculateAge(candidate.dob);
-  const minAge = user.minAgePref || 20;
-  const maxAge = user.maxAgePref || 50;
-  let ageScore = 50;
-  if (candidateAge >= minAge && candidateAge <= maxAge) {
-    ageScore = 100;
-    reasons.push(`Age ${candidateAge} falls inside your preferred range`);
-  } else {
-    const diff = Math.min(Math.abs(candidateAge - minAge), Math.abs(candidateAge - maxAge));
-    ageScore = Math.max(10, 100 - diff * 15);
+  let ageScore = 60;
+  if (candidate.dob) {
+    const candidateAge = calculateAge(candidate.dob);
+    const minAge = user.minAgePref || 18;
+    const maxAge = user.maxAgePref || 60;
+    if (candidateAge >= minAge && candidateAge <= maxAge) {
+      ageScore = 100;
+      reasons.push(`Age (${candidateAge}) matches your preferred range`);
+    } else {
+      const diff = Math.min(Math.abs(candidateAge - minAge), Math.abs(candidateAge - maxAge));
+      ageScore = Math.max(20, 100 - diff * 10);
+    }
   }
   let locationScore = 40;
-  if (user.country.toLowerCase() === candidate.country.toLowerCase()) {
-    if (user.city.toLowerCase() === candidate.city.toLowerCase()) {
+  if (user.country && candidate.country && user.country.toLowerCase() === candidate.country.toLowerCase()) {
+    if (user.city && candidate.city && user.city.toLowerCase() === candidate.city.toLowerCase()) {
       locationScore = 100;
       reasons.push(`Both based in ${user.city}, ${user.country}`);
     } else {
@@ -1591,23 +1681,24 @@ function calculateCompatibility(user, candidate) {
     }
   } else if (user.datingScope === "international" || candidate.datingScope === "international") {
     locationScore = 70;
-    reasons.push("Open to international connections");
+    reasons.push("Open to international dating");
   }
-  const userInterests = user.interests || [];
-  const candidateInterests = candidate.interests || [];
+  const userInterests = Array.isArray(user.interests) ? user.interests : [];
+  const candidateInterests = Array.isArray(candidate.interests) ? candidate.interests : [];
   const sharedInterests = userInterests.filter((i) => candidateInterests.includes(i));
   let interestsScore = 50;
-  if (sharedInterests.length >= 3) {
-    interestsScore = 100;
-    reasons.push(`Shares ${sharedInterests.length} common interests: ${sharedInterests.slice(0, 2).join(", ")}`);
-  } else if (sharedInterests.length > 0) {
-    interestsScore = 70 + sharedInterests.length * 10;
-    reasons.push(`Shares ${sharedInterests.length} interest: ${sharedInterests[0]}`);
+  if (sharedInterests.length > 0) {
+    interestsScore = Math.min(100, 60 + sharedInterests.length * 15);
+    if (sharedInterests.length === 1) {
+      reasons.push(`Shared passion for ${sharedInterests[0]}`);
+    } else {
+      reasons.push(`Shared interests: ${sharedInterests.slice(0, 3).join(", ")}`);
+    }
   }
-  const userLanguages = user.languages || ["English"];
-  const candidateLanguages = candidate.languages || ["English"];
+  const userLanguages = Array.isArray(user.languages) ? user.languages : [];
+  const candidateLanguages = Array.isArray(candidate.languages) ? candidate.languages : [];
   const sharedLanguages = userLanguages.filter((l) => candidateLanguages.includes(l));
-  let languagesScore = 50;
+  let languagesScore = 60;
   if (sharedLanguages.length > 0) {
     languagesScore = 100;
     reasons.push(`Both speak ${sharedLanguages.join(" & ")}`);
@@ -1616,12 +1707,15 @@ function calculateCompatibility(user, candidate) {
   if (user.childrenStatus && candidate.childrenStatus) {
     if (user.childrenStatus === candidate.childrenStatus) {
       lifestyleScore = 100;
-      reasons.push("Compatible family and future goals");
+      reasons.push("Compatible family and future aspirations");
     }
+  }
+  if (reasons.length === 0) {
+    reasons.push("Mutual interest in genuine communication");
   }
   const weights = BUSINESS_CONFIG.MATCHING_WEIGHTS;
   const totalScore = Math.round(
-    intentionScore * weights.INTENTION + ageScore * weights.AGE + locationScore * weights.LOCATION + interestsScore * weights.INTERESTS + languagesScore * weights.LANGUAGE + lifestyleScore * weights.LIFESTYLE + 80 * weights.OTHER
+    intentionScore * weights.INTENTION + ageScore * weights.AGE + locationScore * weights.LOCATION + interestsScore * weights.INTERESTS + languagesScore * weights.LANGUAGE + lifestyleScore * weights.LIFESTYLE + 75 * weights.OTHER
   );
   const finalScore = Math.min(100, Math.max(0, totalScore));
   return {
@@ -1738,7 +1832,7 @@ async function handler9(req, res) {
 }
 
 // api/_routes/members/interaction.ts
-import crypto5 from "crypto";
+import crypto6 from "crypto";
 async function handler10(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -1756,7 +1850,7 @@ async function handler10(req, res) {
   }
   if (action === "pass") {
     memoryStore.passes.push({
-      id: crypto5.randomUUID(),
+      id: crypto6.randomUUID(),
       fromUserId: auth.userId,
       toUserId: targetUserId,
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -1769,7 +1863,7 @@ async function handler10(req, res) {
   );
   if (!existingLike) {
     memoryStore.likes.push({
-      id: crypto5.randomUUID(),
+      id: crypto6.randomUUID(),
       fromUserId: auth.userId,
       toUserId: targetUserId,
       isSuperLike,
@@ -1777,7 +1871,7 @@ async function handler10(req, res) {
     });
     const senderProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
     memoryStore.notifications.unshift({
-      id: crypto5.randomUUID(),
+      id: crypto6.randomUUID(),
       userId: targetUserId,
       type: isSuperLike ? "super_like" : "new_like",
       title: isSuperLike ? "Star Connection!" : "Someone Liked You!",
@@ -1796,15 +1890,51 @@ async function handler10(req, res) {
     );
     let matchId = existingMatch?.id;
     if (!existingMatch) {
-      matchId = crypto5.randomUUID();
+      matchId = crypto6.randomUUID();
+      const userP = memoryStore.profiles.find((p) => p.userId === auth.userId);
+      const userU = memoryStore.users.find((u) => u.id === auth.userId);
+      const targetP = memoryStore.profiles.find((p) => p.userId === targetUserId);
+      const targetU = memoryStore.users.find((u) => u.id === targetUserId);
+      let realScore = 85;
+      if (userP && targetP) {
+        const comp = calculateCompatibility(
+          {
+            id: userP.id,
+            userId: auth.userId,
+            displayName: userP.displayName,
+            gender: userP.gender,
+            interestedIn: userP.interestedIn,
+            country: userP.country,
+            city: userP.city,
+            dob: userU?.dob || "1995-01-01",
+            relationshipIntention: userP.relationshipIntention,
+            languages: userP.languages,
+            interests: userP.interests
+          },
+          {
+            id: targetP.id,
+            userId: targetUserId,
+            displayName: targetP.displayName,
+            gender: targetP.gender,
+            interestedIn: targetP.interestedIn,
+            country: targetP.country,
+            city: targetP.city,
+            dob: targetU?.dob || "1995-01-01",
+            relationshipIntention: targetP.relationshipIntention,
+            languages: targetP.languages,
+            interests: targetP.interests
+          }
+        );
+        realScore = comp.score;
+      }
       memoryStore.matches.unshift({
         id: matchId,
         user1Id: auth.userId,
         user2Id: targetUserId,
-        compatibilityScore: 92,
+        compatibilityScore: realScore,
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
       });
-      const convId = crypto5.randomUUID();
+      const convId = crypto6.randomUUID();
       memoryStore.conversations.push({
         id: convId,
         participant1Id: auth.userId,
@@ -1815,7 +1945,7 @@ async function handler10(req, res) {
       const targetProfile2 = memoryStore.profiles.find((p) => p.userId === targetUserId);
       const senderProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
       memoryStore.notifications.unshift({
-        id: crypto5.randomUUID(),
+        id: crypto6.randomUUID(),
         userId: auth.userId,
         type: "mutual_match",
         title: "It's a Match! \u{1F389}",
@@ -1825,7 +1955,7 @@ async function handler10(req, res) {
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
       });
       memoryStore.notifications.unshift({
-        id: crypto5.randomUUID(),
+        id: crypto6.randomUUID(),
         userId: targetUserId,
         type: "mutual_match",
         title: "It's a Match! \u{1F389}",
@@ -1858,23 +1988,79 @@ async function handler11(req, res) {
   if (!auth) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
+  let currentUser = memoryStore.users.find((u) => u.id === auth.userId);
+  let currentProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
+  if (!currentUser) {
+    const uRes = await query("SELECT * FROM users WHERE id = $1", [auth.userId]);
+    if (uRes?.rows?.[0]) currentUser = uRes.rows[0];
+  }
+  if (!currentProfile) {
+    const pRes = await query("SELECT * FROM profiles WHERE user_id = $1", [auth.userId]);
+    if (pRes?.rows?.[0]) currentProfile = pRes.rows[0];
+  }
   const userMatches = memoryStore.matches.filter(
     (m) => m.user1Id === auth.userId || m.user2Id === auth.userId
   );
   const results = [];
   for (const m of userMatches) {
     const partnerId = m.user1Id === auth.userId ? m.user2Id : m.user1Id;
-    const partnerProfile = memoryStore.profiles.find((p) => p.userId === partnerId);
+    let partnerProfile = memoryStore.profiles.find((p) => p.userId === partnerId);
+    let partnerUser = memoryStore.users.find((u) => u.id === partnerId);
+    if (!partnerProfile) {
+      const pRes = await query("SELECT * FROM profiles WHERE user_id = $1", [partnerId]);
+      if (pRes?.rows?.[0]) partnerProfile = pRes.rows[0];
+    }
+    if (!partnerUser) {
+      const uRes = await query("SELECT * FROM users WHERE id = $1", [partnerId]);
+      if (uRes?.rows?.[0]) partnerUser = uRes.rows[0];
+    }
     if (partnerProfile) {
+      let score = m.compatibilityScore;
+      let reasons = [];
+      let sharedInterests = [];
+      if (currentProfile && partnerProfile) {
+        const userModel = {
+          id: currentProfile.id || currentProfile.userId || auth.userId,
+          userId: auth.userId,
+          displayName: currentProfile.displayName || currentProfile.display_name || "Member",
+          gender: currentProfile.gender || "other",
+          interestedIn: currentProfile.interestedIn || currentProfile.interested_in || "everyone",
+          country: currentProfile.country || "Rwanda",
+          city: currentProfile.city || "Kigali",
+          dob: currentUser?.dob || "1995-01-01",
+          relationshipIntention: currentProfile.relationshipIntention || currentProfile.relationship_intention || "serious_relationship",
+          languages: currentProfile.languages,
+          interests: currentProfile.interests
+        };
+        const partnerModel = {
+          id: partnerProfile.id || partnerProfile.userId || partnerId,
+          userId: partnerId,
+          displayName: partnerProfile.displayName || partnerProfile.display_name || "Member",
+          gender: partnerProfile.gender || "other",
+          interestedIn: partnerProfile.interestedIn || partnerProfile.interested_in || "everyone",
+          country: partnerProfile.country || "Rwanda",
+          city: partnerProfile.city || "Kigali",
+          dob: partnerUser?.dob || "1995-01-01",
+          relationshipIntention: partnerProfile.relationshipIntention || partnerProfile.relationship_intention || "serious_relationship",
+          languages: partnerProfile.languages,
+          interests: partnerProfile.interests
+        };
+        const comp = calculateCompatibility(userModel, partnerModel);
+        score = comp.score;
+        reasons = comp.reasons;
+        sharedInterests = comp.sharedInterests;
+      }
       results.push({
         matchId: m.id,
         partnerId,
-        displayName: partnerProfile.displayName,
-        city: partnerProfile.city,
-        country: partnerProfile.country,
-        relationshipIntention: partnerProfile.relationshipIntention,
+        displayName: partnerProfile.displayName || partnerProfile.display_name || "Member",
+        city: partnerProfile.city || "Rwanda",
+        country: partnerProfile.country || "Rwanda",
+        relationshipIntention: partnerProfile.relationshipIntention || partnerProfile.relationship_intention || "serious_relationship",
         photos: partnerProfile.photos || [],
-        compatibilityScore: m.compatibilityScore || 88,
+        compatibilityScore: score,
+        matchReasons: reasons,
+        sharedInterests,
         createdAt: m.createdAt
       });
     }
@@ -1940,7 +2126,7 @@ async function handler12(req, res) {
 }
 
 // api/_routes/messages/send.ts
-import crypto6 from "crypto";
+import crypto7 from "crypto";
 
 // api/_lib/moderation.ts
 var EN_NUMBER_WORDS = {
@@ -2132,6 +2318,7 @@ async function handler13(req, res) {
   if (!auth) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
+  await loadAdminSettingsFromDb();
   if (req.method === "GET") {
     const partnerId = req.query?.partnerId;
     if (!partnerId) {
@@ -2158,8 +2345,19 @@ async function handler13(req, res) {
     const isUnlocked = memoryStore.contactUnlocks.some(
       (cu) => cu.requesterId === auth.userId && cu.targetUserId === partnerId
     );
-    const partnerUser = memoryStore.users.find((u) => u.id === partnerId);
-    const partnerProfile = memoryStore.profiles.find((p) => p.userId === partnerId);
+    let partnerUser = memoryStore.users.find((u) => u.id === partnerId);
+    let partnerProfile = memoryStore.profiles.find((p) => p.userId === partnerId);
+    if (!partnerUser) {
+      const uRes = await query("SELECT * FROM users WHERE id = $1", [partnerId]);
+      if (uRes?.rows?.[0]) partnerUser = uRes.rows[0];
+    }
+    if (!partnerProfile) {
+      const pRes = await query("SELECT * FROM profiles WHERE user_id = $1", [partnerId]);
+      if (pRes?.rows?.[0]) partnerProfile = pRes.rows[0];
+    }
+    const contactUnlockPrice = Number(
+      memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF
+    );
     return res.status(200).json({
       success: true,
       messages: history,
@@ -2167,8 +2365,12 @@ async function handler13(req, res) {
       wallet,
       hasActiveSubscription: Boolean(activeSub),
       isContactUnlocked: isUnlocked,
-      partnerPhone: isUnlocked ? `${partnerUser?.phoneCode} ${partnerUser?.phone}` : null,
-      partnerConsentGiven: partnerProfile?.contactSharingConsent || false
+      contactUnlockPrice,
+      partnerName: partnerProfile?.displayName || partnerProfile?.display_name || partnerUser?.displayName || "Member",
+      partnerAvatar: partnerProfile?.photos && partnerProfile.photos[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+      partnerCity: partnerProfile?.city || "Rwanda",
+      partnerPhone: isUnlocked ? `${partnerUser?.phoneCode || partnerUser?.phone_code || "+250"} ${partnerUser?.phone}` : null,
+      partnerConsentGiven: partnerProfile?.contactSharingConsent ?? partnerProfile?.contact_sharing_consent ?? true
     });
   }
   if (req.method === "POST") {
@@ -2183,7 +2385,7 @@ async function handler13(req, res) {
     const moderation = checkMessageModeration(trimmedContent);
     if (moderation.isViolation) {
       memoryStore.moderationEvents.unshift({
-        id: crypto6.randomUUID(),
+        id: crypto7.randomUUID(),
         userId: auth.userId,
         eventType: moderation.violationType,
         rawContent: trimmedContent,
@@ -2268,7 +2470,7 @@ async function handler13(req, res) {
       memoryStore.allowances.set(auth.userId, userAllowances);
     }
     const messageRecord = {
-      id: crypto6.randomUUID(),
+      id: crypto7.randomUUID(),
       senderId: auth.userId,
       recipientId,
       content: trimmedContent,
@@ -2278,7 +2480,7 @@ async function handler13(req, res) {
     memoryStore.messages.push(messageRecord);
     const senderProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
     memoryStore.notifications.unshift({
-      id: crypto6.randomUUID(),
+      id: crypto7.randomUUID(),
       userId: recipientId,
       type: "new_message",
       title: `Message from ${senderProfile?.displayName || "a member"}`,
@@ -2302,7 +2504,7 @@ async function handler13(req, res) {
 }
 
 // api/_routes/messages/unlock-contact.ts
-import crypto7 from "crypto";
+import crypto8 from "crypto";
 async function handler14(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -2311,6 +2513,7 @@ async function handler14(req, res) {
   if (!auth) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
+  await loadAdminSettingsFromDb();
   const { targetUserId } = req.body;
   if (!targetUserId) {
     return res.status(400).json({ success: false, error: "Target user ID is required" });
@@ -2318,30 +2521,41 @@ async function handler14(req, res) {
   if (targetUserId === auth.userId) {
     return res.status(400).json({ success: false, error: "Cannot unlock your own contact info" });
   }
-  const targetUser = memoryStore.users.find((u) => u.id === targetUserId);
-  const targetProfile = memoryStore.profiles.find((p) => p.userId === targetUserId);
+  let targetUser = memoryStore.users.find((u) => u.id === targetUserId);
+  let targetProfile = memoryStore.profiles.find((p) => p.userId === targetUserId);
+  if (!targetUser) {
+    const uRes = await query("SELECT * FROM users WHERE id = $1", [targetUserId]);
+    if (uRes?.rows?.[0]) targetUser = uRes.rows[0];
+  }
+  if (!targetProfile) {
+    const pRes = await query("SELECT * FROM profiles WHERE user_id = $1", [targetUserId]);
+    if (pRes?.rows?.[0]) targetProfile = pRes.rows[0];
+  }
   if (!targetUser || !targetProfile) {
     return res.status(404).json({ success: false, error: "Target member profile not found" });
   }
   if (targetUser.isSuspended) {
     return res.status(403).json({ success: false, error: "Cannot unlock contact of a restricted member" });
   }
-  if (!targetProfile.contactSharingConsent) {
+  const hasConsent = targetProfile.contactSharingConsent ?? targetProfile.contact_sharing_consent ?? true;
+  if (!hasConsent) {
     return res.status(403).json({
       success: false,
       error: "CONSENT_REQUIRED",
-      message: `${targetProfile.displayName} has not enabled direct contact sharing on their profile yet. You can ask them respectfully via chat first.`
+      message: `${targetProfile.displayName || "Member"} has not enabled direct contact sharing on their profile yet. You can ask them respectfully via chat first.`
     });
   }
   const alreadyUnlocked = memoryStore.contactUnlocks.some(
     (cu) => cu.requesterId === auth.userId && cu.targetUserId === targetUserId
   );
+  const phoneFormatted = `${targetUser.phoneCode || targetUser.phone_code || "+250"} ${targetUser.phone || ""}`.trim();
+  const displayName = targetProfile.displayName || targetProfile.display_name || "Member";
   if (alreadyUnlocked) {
     return res.status(200).json({
       success: true,
       alreadyUnlocked: true,
-      phone: `${targetUser.phoneCode} ${targetUser.phone}`,
-      displayName: targetProfile.displayName
+      phone: phoneFormatted,
+      displayName
     });
   }
   const unlockCost = Number(memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
@@ -2360,7 +2574,7 @@ async function handler14(req, res) {
     });
   }
   const unlockRecord = {
-    id: crypto7.randomUUID(),
+    id: crypto8.randomUUID(),
     requesterId: auth.userId,
     targetUserId,
     amountPaidMinor: unlockCost,
@@ -2370,7 +2584,7 @@ async function handler14(req, res) {
   memoryStore.contactUnlocks.push(unlockRecord);
   const requesterProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
   memoryStore.notifications.unshift({
-    id: crypto7.randomUUID(),
+    id: crypto8.randomUUID(),
     userId: targetUserId,
     type: "contact_unlocked",
     title: "Contact Shared",
@@ -2430,12 +2644,12 @@ async function handler16(req, res) {
 }
 
 // api/_lib/flutterwave.ts
-import crypto8 from "crypto";
+import crypto9 from "crypto";
 var FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "FLWSECK_TEST-mock-secret-key-kunda";
 var FLW_SECRET_HASH = process.env.FLW_SECRET_HASH || "kunda_space_flw_webhook_secret_hash_verify";
 var APP_URL = process.env.APP_URL || "http://localhost:5173";
 async function initializeFlutterwavePayment(params) {
-  const txRef = `KUNDA_${Date.now()}_${crypto8.randomBytes(4).toString("hex")}`;
+  const txRef = `KUNDA_${Date.now()}_${crypto9.randomBytes(4).toString("hex")}`;
   const currency = params.currency || "RWF";
   if (process.env.FLW_SECRET_KEY && !process.env.FLW_SECRET_KEY.includes("mock")) {
     try {
@@ -2544,7 +2758,7 @@ async function handler17(req, res) {
 }
 
 // api/_routes/payments/webhook.ts
-import crypto9 from "crypto";
+import crypto10 from "crypto";
 async function handler18(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -2577,7 +2791,7 @@ async function handler18(req, res) {
       // Idempotency key
     );
     memoryStore.notifications.unshift({
-      id: crypto9.randomUUID(),
+      id: crypto10.randomUUID(),
       userId: user.id,
       type: "deposit_confirmed",
       title: "Deposit Confirmed! \u{1F4B3}",
@@ -2592,7 +2806,7 @@ async function handler18(req, res) {
 }
 
 // api/_routes/payments/verify.ts
-import crypto10 from "crypto";
+import crypto11 from "crypto";
 async function handler19(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -2628,7 +2842,7 @@ async function handler19(req, res) {
     txRef
   );
   memoryStore.notifications.unshift({
-    id: crypto10.randomUUID(),
+    id: crypto11.randomUUID(),
     userId: auth.userId,
     type: "deposit_confirmed",
     title: "Deposit Successful! \u{1F4B3}",
@@ -2767,7 +2981,7 @@ async function handler20(req, res) {
 }
 
 // api/_routes/subscriptions/subscribe.ts
-import crypto11 from "crypto";
+import crypto12 from "crypto";
 async function handler21(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -2814,7 +3028,7 @@ async function handler21(req, res) {
   const expiresAt = /* @__PURE__ */ new Date();
   expiresAt.setDate(expiresAt.getDate() + durationDays);
   const subRecord = {
-    id: crypto11.randomUUID(),
+    id: crypto12.randomUUID(),
     userId: auth.userId,
     planCode,
     planName,
@@ -2832,7 +3046,7 @@ async function handler21(req, res) {
   } catch (err) {
   }
   memoryStore.notifications.unshift({
-    id: crypto11.randomUUID(),
+    id: crypto12.randomUUID(),
     userId: auth.userId,
     type: "subscription_active",
     title: "Membership Activated! \u{1F31F}",

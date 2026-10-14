@@ -44,6 +44,14 @@ export const Login: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Login submit caught error:', err);
+      const rawBody = err?.response?.data;
+
+      // Unverified account redirect
+      if (rawBody?.requiresVerification || rawBody?.error === 'EMAIL_NOT_VERIFIED') {
+        navigate(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`);
+        return;
+      }
+
       const friendlyMsg = getErrorMessage(err);
       setError(friendlyMsg);
 
