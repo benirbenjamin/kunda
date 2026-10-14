@@ -58,7 +58,6 @@ export const Login: React.FC = () => {
       // Collect technical details for user transparency
       const status = err?.response?.status;
       const statusText = err?.response?.statusText;
-      const rawBody = err?.response?.data;
       const detailStr = [
         status ? `Status: ${status} ${statusText || ''}` : '',
         typeof rawBody === 'string' ? rawBody : (rawBody?.error ? JSON.stringify(rawBody.error) : ''),
