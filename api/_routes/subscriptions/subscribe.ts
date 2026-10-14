@@ -3,7 +3,7 @@
 // =====================================================================
 import crypto from 'crypto';
 import { extractAuthUser } from '../../_lib/auth.js';
-import { memoryStore } from '../../_lib/db.js';
+import { memoryStore, loadAdminSettingsFromDb, query } from '../../_lib/db.js';
 import { debitWallet, getWalletBalance } from '../../_lib/wallet.js';
 import { BUSINESS_CONFIG } from '../../_lib/config.js';
 
@@ -17,15 +17,31 @@ export default async function handler(req: any, res: any) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
+  // Ensure settings are loaded
+  await loadAdminSettingsFromDb();
+
   const { planCode } = req.body;
-  if (!planCode || !['three_day', 'weekly'].includes(planCode)) {
-    return res.status(400).json({ success: false, error: 'Valid planCode (three_day, weekly) is required' });
+  if (!planCode || !['hourly', 'three_day', 'weekly'].includes(planCode)) {
+    return res.status(400).json({ success: false, error: 'Valid planCode (hourly, three_day, weekly) is required' });
   }
 
-  const isThreeDay = planCode === 'three_day';
-  const price = isThreeDay ? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF : BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF;
-  const durationDays = isThreeDay ? 3 : 7;
-  const planName = isThreeDay ? '3-Day Connection Pass' : 'Weekly Premium Pass';
+  let price = 0;
+  let durationDays = 0;
+  let planName = '';
+
+  if (planCode === 'hourly') {
+    price = Number(memoryStore.adminSettings.get('hourly_pass_cost') ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF);
+    durationDays = 1;
+    planName = 'Hourly Pass (24 Hours)';
+  } else if (planCode === 'three_day') {
+    price = Number(memoryStore.adminSettings.get('three_day_pass_cost') ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF);
+    durationDays = 3;
+    planName = '3-Day Connection Pass';
+  } else {
+    price = Number(memoryStore.adminSettings.get('weekly_pass_cost') ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF);
+    durationDays = 7;
+    planName = 'Weekly Premium Pass';
+  }
 
   // 1. Debit Wallet
   const debitRes = await debitWallet(
@@ -59,6 +75,17 @@ export default async function handler(req: any, res: any) {
   };
 
   memoryStore.subscriptions.push(subRecord);
+
+  // Attempt DB persistence if table exists
+  try {
+    await query(
+      `INSERT INTO subscriptions (id, user_id, started_at, expires_at, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [subRecord.id, subRecord.userId, subRecord.startedAt, subRecord.expiresAt, 'active']
+    );
+  } catch (err) {
+    // Non-fatal, memoryStore holds state
+  }
 
   // 3. In-App Notification
   memoryStore.notifications.unshift({

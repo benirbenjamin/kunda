@@ -444,27 +444,50 @@ export const AdminDashboard: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
               <Input
                 label="Free Replies Allowed"
                 type="number"
                 value={settings.freeReplies}
                 onChange={(e) => setSettings({ ...settings, freeReplies: e.target.value })}
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <Input
+                label="Hourly / 24h Pass (RWF)"
+                type="number"
+                value={settings.hourlyPassPrice ?? 500}
+                onChange={(e) => setSettings({ ...settings, hourlyPassPrice: e.target.value })}
+              />
+              <Input
+                label="3-Day Pass Price (RWF)"
+                type="number"
+                value={settings.threeDayPassPrice ?? 1500}
+                onChange={(e) => setSettings({ ...settings, threeDayPassPrice: e.target.value })}
+              />
+              <Input
+                label="Weekly Pass Price (RWF)"
+                type="number"
+                value={settings.weeklyPassPrice ?? 3000}
+                onChange={(e) => setSettings({ ...settings, weeklyPassPrice: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Pay-Per-Message Price (RWF)"
                 type="number"
                 value={settings.payPerMessagePrice}
                 onChange={(e) => setSettings({ ...settings, payPerMessagePrice: e.target.value })}
               />
+              <Input
+                label="Direct Contact Unlock Price (RWF)"
+                type="number"
+                value={settings.contactUnlockPrice}
+                onChange={(e) => setSettings({ ...settings, contactUnlockPrice: e.target.value })}
+              />
             </div>
-
-            <Input
-              label="Direct Contact Unlock Price (RWF)"
-              type="number"
-              value={settings.contactUnlockPrice}
-              onChange={(e) => setSettings({ ...settings, contactUnlockPrice: e.target.value })}
-            />
           </div>
 
           {/* Section 2: Email Configuration (Resend vs SMTP) */}

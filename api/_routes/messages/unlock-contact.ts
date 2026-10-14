@@ -62,7 +62,7 @@ export default async function handler(req: any, res: any) {
   }
 
   // 3. Debit Wallet
-  const unlockCost = BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF;
+  const unlockCost = Number(memoryStore.adminSettings.get('contact_unlock_cost') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
   const debitRes = await debitWallet(
     auth.userId,
     unlockCost,

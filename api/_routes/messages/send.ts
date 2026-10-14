@@ -114,10 +114,15 @@ export default async function handler(req: any, res: any) {
     let allowanceMethod = 'unlimited_subscription';
 
     if (!activeSub) {
+      const freeInitLimit = Number(memoryStore.adminSettings.get('free_initial_messages') ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+      const freeDistinctLimit = Number(memoryStore.adminSettings.get('free_distinct_recipients') ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+      const freeRepliesLimit = Number(memoryStore.adminSettings.get('free_replies') ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+      const payPerMsgCost = Number(memoryStore.adminSettings.get('pay_per_message_cost') ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF);
+
       const userAllowances = memoryStore.allowances.get(auth.userId) || {
-        initialRemaining: BUSINESS_CONFIG.FREE_INITIAL_MESSAGES,
+        initialRemaining: freeInitLimit,
         distinctRecipients: [],
-        repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED,
+        repliesRemaining: freeRepliesLimit,
       };
 
       // Check if conversation already exists with this recipient
@@ -131,7 +136,7 @@ export default async function handler(req: any, res: any) {
         // Initial message to a new recipient
         if (
           userAllowances.initialRemaining > 0 &&
-          userAllowances.distinctRecipients.length < BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS
+          userAllowances.distinctRecipients.length < freeDistinctLimit
         ) {
           userAllowances.initialRemaining -= 1;
           if (!userAllowances.distinctRecipients.includes(recipientId)) {
@@ -140,7 +145,6 @@ export default async function handler(req: any, res: any) {
           allowanceMethod = 'free_initial_message';
         } else {
           // Free initial allowance exhausted -> charge pay-per-message
-          const payPerMsgCost = BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF;
           const debitResult = await debitWallet(
             auth.userId,
             payPerMsgCost,
@@ -166,7 +170,6 @@ export default async function handler(req: any, res: any) {
           allowanceMethod = 'free_reply';
         } else {
           // Free replies exhausted -> charge pay-per-message
-          const payPerMsgCost = BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF;
           const debitResult = await debitWallet(
             auth.userId,
             payPerMsgCost,

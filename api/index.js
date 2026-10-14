@@ -12,10 +12,11 @@ var BUSINESS_CONFIG = {
   FREE_DISTINCT_RECIPIENTS: 3,
   FREE_REPLIES_ALLOWED: 3,
   // Costs (in minor units: 1 RWF = 1 unit or cents)
-  PAY_PER_MESSAGE_PRICE_RWF: 150,
-  CONTACT_UNLOCK_PRICE_RWF: 2e3,
+  HOURLY_PASS_PRICE_RWF: 500,
   THREE_DAY_PASS_PRICE_RWF: 1500,
   WEEKLY_PASS_PRICE_RWF: 3e3,
+  PAY_PER_MESSAGE_PRICE_RWF: 150,
+  CONTACT_UNLOCK_PRICE_RWF: 2e3,
   DEFAULT_CURRENCY: "RWF",
   // Algorithm weights (0-100)
   MATCHING_WEIGHTS: {
@@ -210,6 +211,9 @@ function initMemoryStore() {
   memoryStore.adminSettings.set("free_initial_messages", 3);
   memoryStore.adminSettings.set("free_distinct_recipients", 3);
   memoryStore.adminSettings.set("free_replies", 3);
+  memoryStore.adminSettings.set("hourly_pass_cost", 500);
+  memoryStore.adminSettings.set("three_day_pass_cost", 1500);
+  memoryStore.adminSettings.set("weekly_pass_cost", 3e3);
   memoryStore.adminSettings.set("pay_per_message_cost", 150);
   memoryStore.adminSettings.set("contact_unlock_cost", 2e3);
   memoryStore.adminSettings.set("default_currency", "RWF");
@@ -484,6 +488,96 @@ async function query(sql, params = []) {
   }
   return null;
 }
+var settingsTableInitialized = false;
+async function ensureAdminSettingsTable() {
+  if (settingsTableInitialized) return;
+  try {
+    if (pgPool) {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS admin_settings (
+          "key" VARCHAR(100) NOT NULL PRIMARY KEY,
+          "value" TEXT NOT NULL,
+          "description" TEXT,
+          "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      settingsTableInitialized = true;
+    } else if (mysqlPool) {
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS \`admin_settings\` (
+          \`key\` VARCHAR(100) NOT NULL PRIMARY KEY,
+          \`value\` JSON NOT NULL,
+          \`description\` TEXT,
+          \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      settingsTableInitialized = true;
+    }
+  } catch (err) {
+    console.warn("\u26A0\uFE0F ensureAdminSettingsTable warning:", err);
+  }
+}
+async function loadAdminSettingsFromDb() {
+  await ensureAdminSettingsTable();
+  try {
+    let rows = [];
+    if (pgPool) {
+      const res = await pgPool.query('SELECT "key", "value" FROM admin_settings');
+      rows = res.rows || [];
+    } else if (mysqlPool) {
+      const [res] = await mysqlPool.query("SELECT `key`, `value` FROM `admin_settings`");
+      if (Array.isArray(res)) rows = res;
+    }
+    for (const r of rows) {
+      const k = r.key ?? r.KEY;
+      let v = r.value ?? r.VALUE;
+      if (typeof v === "string") {
+        try {
+          v = JSON.parse(v);
+        } catch {
+        }
+      }
+      if (k !== void 0 && v !== void 0) {
+        memoryStore.adminSettings.set(k, v);
+      }
+    }
+  } catch (err) {
+    console.warn("\u26A0\uFE0F loadAdminSettingsFromDb warning:", err);
+  }
+  return memoryStore.adminSettings;
+}
+async function saveAdminSettingToDb(key, value) {
+  memoryStore.adminSettings.set(key, value);
+  await ensureAdminSettingsTable();
+  const jsonVal = JSON.stringify(value);
+  try {
+    if (pgPool) {
+      await pgPool.query(
+        `INSERT INTO admin_settings ("key", "value", "updated_at")
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value", "updated_at" = CURRENT_TIMESTAMP`,
+        [key, jsonVal]
+      );
+      return true;
+    } else if (mysqlPool) {
+      await mysqlPool.query(
+        `INSERT INTO \`admin_settings\` (\`key\`, \`value\`)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`), \`updated_at\` = CURRENT_TIMESTAMP`,
+        [key, jsonVal]
+      );
+      return true;
+    }
+  } catch (err) {
+    console.error(`\u26A0\uFE0F Failed to persist admin setting "${key}" to DB:`, err);
+    return false;
+  }
+  return true;
+}
+setTimeout(() => {
+  loadAdminSettingsFromDb().catch(() => {
+  });
+}, 500);
 
 // api/_lib/email.ts
 import nodemailer from "nodemailer";
@@ -2111,23 +2205,26 @@ async function handler13(req, res) {
     let isChargeApplied = false;
     let allowanceMethod = "unlimited_subscription";
     if (!activeSub) {
+      const freeInitLimit = Number(memoryStore.adminSettings.get("free_initial_messages") ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+      const freeDistinctLimit = Number(memoryStore.adminSettings.get("free_distinct_recipients") ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+      const freeRepliesLimit = Number(memoryStore.adminSettings.get("free_replies") ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+      const payPerMsgCost = Number(memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF);
       const userAllowances = memoryStore.allowances.get(auth.userId) || {
-        initialRemaining: BUSINESS_CONFIG.FREE_INITIAL_MESSAGES,
+        initialRemaining: freeInitLimit,
         distinctRecipients: [],
-        repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED
+        repliesRemaining: freeRepliesLimit
       };
       const existingThread = memoryStore.messages.some(
         (m) => m.senderId === auth.userId && m.recipientId === recipientId || m.senderId === recipientId && m.recipientId === auth.userId
       );
       if (!existingThread) {
-        if (userAllowances.initialRemaining > 0 && userAllowances.distinctRecipients.length < BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS) {
+        if (userAllowances.initialRemaining > 0 && userAllowances.distinctRecipients.length < freeDistinctLimit) {
           userAllowances.initialRemaining -= 1;
           if (!userAllowances.distinctRecipients.includes(recipientId)) {
             userAllowances.distinctRecipients.push(recipientId);
           }
           allowanceMethod = "free_initial_message";
         } else {
-          const payPerMsgCost = BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF;
           const debitResult = await debitWallet(
             auth.userId,
             payPerMsgCost,
@@ -2150,7 +2247,6 @@ async function handler13(req, res) {
           userAllowances.repliesRemaining -= 1;
           allowanceMethod = "free_reply";
         } else {
-          const payPerMsgCost = BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF;
           const debitResult = await debitWallet(
             auth.userId,
             payPerMsgCost,
@@ -2248,7 +2344,7 @@ async function handler14(req, res) {
       displayName: targetProfile.displayName
     });
   }
-  const unlockCost = BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF;
+  const unlockCost = Number(memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
   const debitRes = await debitWallet(
     auth.userId,
     unlockCost,
@@ -2551,6 +2647,13 @@ async function handler19(req, res) {
 
 // api/_routes/subscriptions/plans.ts
 async function handler20(req, res) {
+  await loadAdminSettingsFromDb();
+  const hourlyPrice = Number(memoryStore.adminSettings.get("hourly_pass_cost") ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF);
+  const threeDayPrice = Number(memoryStore.adminSettings.get("three_day_pass_cost") ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF);
+  const weeklyPrice = Number(memoryStore.adminSettings.get("weekly_pass_cost") ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF);
+  const payPerMessagePrice = Number(memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF);
+  const contactUnlockPrice = Number(memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
+  const currency = memoryStore.adminSettings.get("default_currency") || BUSINESS_CONFIG.DEFAULT_CURRENCY;
   const plans = [
     {
       code: "free",
@@ -2561,7 +2664,7 @@ async function handler20(req, res) {
       description_rw: "Reba abanyamuryango, ubutumwa 3 ku buntu ku bantu bashya n'ibisubizo 3.",
       description_fr: "Explorez les profils v\xE9rifi\xE9s, 3 messages gratuits et 3 r\xE9ponses gratuites.",
       price: 0,
-      currency: "RWF",
+      currency,
       durationDays: 0,
       features: [
         "Complete Profile Setup",
@@ -2571,15 +2674,33 @@ async function handler20(req, res) {
       ]
     },
     {
+      code: "hourly",
+      name_en: "Hourly Pass (24 Hours)",
+      name_rw: "Pass y'Amasaha 24",
+      name_fr: "Pass Connexion 24 Heures",
+      description_en: `Unlimited messaging for 24 hours. Quick connection boost for ${hourlyPrice} ${currency}.`,
+      description_rw: `Ubutumwa budafite umupaka mu masaha 24 kuri ${hourlyPrice} ${currency}.`,
+      description_fr: `Messagerie illimit\xE9e pendant 24 heures pour ${hourlyPrice} ${currency}.`,
+      price: hourlyPrice,
+      currency,
+      durationDays: 1,
+      features: [
+        "Unlimited Outgoing Messages for 24h",
+        "Instant Profile Match Delivery",
+        "No per-message deductions",
+        "Safe internal chat delivery"
+      ]
+    },
+    {
       code: "three_day",
       name_en: "3-Day Connection Pass",
       name_rw: "Icyumweru Gitoya (Iminsi 3)",
       name_fr: "Pass Connexion 3 Jours",
-      description_en: "Unlimited messaging for 72 hours. Perfect for weekend romance.",
-      description_rw: "Ubutumwa budafite umupaka mu masaha 72. Byiza ku mpera z'icyumweru.",
-      description_fr: "Messagerie illimit\xE9e pendant 72 heures. Id\xE9al pour le week-end.",
-      price: 1500,
-      currency: "RWF",
+      description_en: `Unlimited messaging for 72 hours. Perfect for weekend romance (${threeDayPrice} ${currency}).`,
+      description_rw: `Ubutumwa budafite umupaka mu masaha 72 kuri ${threeDayPrice} ${currency}. Byiza ku mpera z'icyumweru.`,
+      description_fr: `Messagerie illimit\xE9e pendant 72 heures (${threeDayPrice} ${currency}). Id\xE9al pour le week-end.`,
+      price: threeDayPrice,
+      currency,
       durationDays: 3,
       isPopular: true,
       features: [
@@ -2594,11 +2715,11 @@ async function handler20(req, res) {
       name_en: "Weekly Premium",
       name_rw: "Icyumweru Cyose",
       name_fr: "Pass Hebdomadaire Premium",
-      description_en: "Full access for 7 days with priority discovery and unlimited messaging.",
-      description_rw: "Kuganira bidahagarara icyumweru cyose no kugaragara mbere.",
-      description_fr: "Acc\xE8s illimit\xE9 pendant 7 jours avec visibilit\xE9 prioritaire.",
-      price: 3e3,
-      currency: "RWF",
+      description_en: `Full access for 7 days with priority discovery and unlimited messaging (${weeklyPrice} ${currency}).`,
+      description_rw: `Kuganira bidahagarara icyumweru cyose no kugaragara mbere kuri ${weeklyPrice} ${currency}.`,
+      description_fr: `Acc\xE8s illimit\xE9 pendant 7 jours avec visibilit\xE9 prioritaire (${weeklyPrice} ${currency}).`,
+      price: weeklyPrice,
+      currency,
       durationDays: 7,
       features: [
         "Unlimited Messaging for 7 Days",
@@ -2612,11 +2733,11 @@ async function handler20(req, res) {
       name_en: "Pay-Per-Message",
       name_rw: "Kwishyura Buri Butumwa",
       name_fr: "Paiement Par Message",
-      description_en: "Pay 150 RWF only when you send an individual message after free allowance.",
-      description_rw: "Ishyura 150 RWF gusa ku butumwa wohereje iyo ubufasha burangiye.",
-      description_fr: "Payez 150 RWF par message envoy\xE9 hors quota gratuit.",
-      price: 150,
-      currency: "RWF",
+      description_en: `Pay ${payPerMessagePrice} ${currency} only when you send an individual message after free allowance.`,
+      description_rw: `Ishyura ${payPerMessagePrice} ${currency} gusa ku butumwa wohereje iyo ubufasha burangiye.`,
+      description_fr: `Payez ${payPerMessagePrice} ${currency} par message envoy\xE9 hors quota gratuit.`,
+      price: payPerMessagePrice,
+      currency,
       durationDays: 0,
       features: [
         "Zero recurring commitment",
@@ -2629,11 +2750,11 @@ async function handler20(req, res) {
       name_en: "Direct Contact Unlock",
       name_rw: "Kureba Nimero ya Telefone",
       name_fr: "D\xE9blocage Contact Direct",
-      description_en: "Unlock direct phone number when the member gives mutual consent.",
-      description_rw: "Reba numero ya telefone mugihe mwembi mwabyemeranyijweho.",
-      description_fr: "D\xE9bloquez le num\xE9ro de t\xE9l\xE9phone avec consentement mutuel.",
-      price: 2e3,
-      currency: "RWF",
+      description_en: `Unlock direct phone number when the member gives mutual consent (${contactUnlockPrice} ${currency}).`,
+      description_rw: `Reba numero ya telefone mugihe mwembi mwabyemeranyijweho (${contactUnlockPrice} ${currency}).`,
+      description_fr: `D\xE9bloquez le num\xE9ro de t\xE9l\xE9phone avec consentement mutuel (${contactUnlockPrice} ${currency}).`,
+      price: contactUnlockPrice,
+      currency,
       durationDays: 0,
       features: [
         "Direct phone number revealed",
@@ -2655,14 +2776,27 @@ async function handler21(req, res) {
   if (!auth) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
+  await loadAdminSettingsFromDb();
   const { planCode } = req.body;
-  if (!planCode || !["three_day", "weekly"].includes(planCode)) {
-    return res.status(400).json({ success: false, error: "Valid planCode (three_day, weekly) is required" });
+  if (!planCode || !["hourly", "three_day", "weekly"].includes(planCode)) {
+    return res.status(400).json({ success: false, error: "Valid planCode (hourly, three_day, weekly) is required" });
   }
-  const isThreeDay = planCode === "three_day";
-  const price = isThreeDay ? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF : BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF;
-  const durationDays = isThreeDay ? 3 : 7;
-  const planName = isThreeDay ? "3-Day Connection Pass" : "Weekly Premium Pass";
+  let price = 0;
+  let durationDays = 0;
+  let planName = "";
+  if (planCode === "hourly") {
+    price = Number(memoryStore.adminSettings.get("hourly_pass_cost") ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF);
+    durationDays = 1;
+    planName = "Hourly Pass (24 Hours)";
+  } else if (planCode === "three_day") {
+    price = Number(memoryStore.adminSettings.get("three_day_pass_cost") ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF);
+    durationDays = 3;
+    planName = "3-Day Connection Pass";
+  } else {
+    price = Number(memoryStore.adminSettings.get("weekly_pass_cost") ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF);
+    durationDays = 7;
+    planName = "Weekly Premium Pass";
+  }
   const debitRes = await debitWallet(
     auth.userId,
     price,
@@ -2689,6 +2823,14 @@ async function handler21(req, res) {
     status: "active"
   };
   memoryStore.subscriptions.push(subRecord);
+  try {
+    await query(
+      `INSERT INTO subscriptions (id, user_id, started_at, expires_at, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [subRecord.id, subRecord.userId, subRecord.startedAt, subRecord.expiresAt, "active"]
+    );
+  } catch (err) {
+  }
   memoryStore.notifications.unshift({
     id: crypto11.randomUUID(),
     userId: auth.userId,
@@ -2898,11 +3040,17 @@ async function handler25(req, res) {
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
   }
+  await loadAdminSettingsFromDb();
   if (req.method === "GET") {
     const currentSettings = {
+      // Free Allowances
       freeInitialMessages: memoryStore.adminSettings.get("free_initial_messages") ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES,
       freeDistinctRecipients: memoryStore.adminSettings.get("free_distinct_recipients") ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS,
       freeReplies: memoryStore.adminSettings.get("free_replies") ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED,
+      // Dynamic Plan Pricing & Costs
+      hourlyPassPrice: memoryStore.adminSettings.get("hourly_pass_cost") ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF,
+      threeDayPassPrice: memoryStore.adminSettings.get("three_day_pass_cost") ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF,
+      weeklyPassPrice: memoryStore.adminSettings.get("weekly_pass_cost") ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF,
       payPerMessagePrice: memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF,
       contactUnlockPrice: memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF,
       defaultCurrency: memoryStore.adminSettings.get("default_currency") ?? BUSINESS_CONFIG.DEFAULT_CURRENCY,
@@ -2930,38 +3078,52 @@ async function handler25(req, res) {
     if (!updates || typeof updates !== "object") {
       return res.status(400).json({ success: false, error: "Invalid settings payload" });
     }
+    const savePromises = [];
     if (updates.freeInitialMessages !== void 0) {
-      memoryStore.adminSettings.set("free_initial_messages", parseInt(updates.freeInitialMessages, 10));
+      savePromises.push(saveAdminSettingToDb("free_initial_messages", parseInt(updates.freeInitialMessages, 10)));
     }
     if (updates.freeDistinctRecipients !== void 0) {
-      memoryStore.adminSettings.set("free_distinct_recipients", parseInt(updates.freeDistinctRecipients, 10));
+      savePromises.push(saveAdminSettingToDb("free_distinct_recipients", parseInt(updates.freeDistinctRecipients, 10)));
     }
     if (updates.freeReplies !== void 0) {
-      memoryStore.adminSettings.set("free_replies", parseInt(updates.freeReplies, 10));
+      savePromises.push(saveAdminSettingToDb("free_replies", parseInt(updates.freeReplies, 10)));
+    }
+    if (updates.hourlyPassPrice !== void 0) {
+      savePromises.push(saveAdminSettingToDb("hourly_pass_cost", parseInt(updates.hourlyPassPrice, 10)));
+    }
+    if (updates.threeDayPassPrice !== void 0) {
+      savePromises.push(saveAdminSettingToDb("three_day_pass_cost", parseInt(updates.threeDayPassPrice, 10)));
+    }
+    if (updates.weeklyPassPrice !== void 0) {
+      savePromises.push(saveAdminSettingToDb("weekly_pass_cost", parseInt(updates.weeklyPassPrice, 10)));
     }
     if (updates.payPerMessagePrice !== void 0) {
-      memoryStore.adminSettings.set("pay_per_message_cost", parseInt(updates.payPerMessagePrice, 10));
+      savePromises.push(saveAdminSettingToDb("pay_per_message_cost", parseInt(updates.payPerMessagePrice, 10)));
     }
     if (updates.contactUnlockPrice !== void 0) {
-      memoryStore.adminSettings.set("contact_unlock_cost", parseInt(updates.contactUnlockPrice, 10));
+      savePromises.push(saveAdminSettingToDb("contact_unlock_cost", parseInt(updates.contactUnlockPrice, 10)));
+    }
+    if (updates.defaultCurrency !== void 0) {
+      savePromises.push(saveAdminSettingToDb("default_currency", updates.defaultCurrency));
     }
     if (updates.moderationStrictness !== void 0) {
-      memoryStore.adminSettings.set("moderation_strictness", updates.moderationStrictness);
+      savePromises.push(saveAdminSettingToDb("moderation_strictness", updates.moderationStrictness));
     }
-    if (updates.emailProvider !== void 0) memoryStore.adminSettings.set("email_provider", updates.emailProvider);
-    if (updates.resendApiKey !== void 0) memoryStore.adminSettings.set("resend_api_key", updates.resendApiKey);
-    if (updates.resendFromEmail !== void 0) memoryStore.adminSettings.set("resend_from_email", updates.resendFromEmail);
-    if (updates.smtpHost !== void 0) memoryStore.adminSettings.set("smtp_host", updates.smtpHost);
-    if (updates.smtpPort !== void 0) memoryStore.adminSettings.set("smtp_port", parseInt(updates.smtpPort, 10));
-    if (updates.smtpSecure !== void 0) memoryStore.adminSettings.set("smtp_secure", Boolean(updates.smtpSecure));
-    if (updates.smtpUser !== void 0) memoryStore.adminSettings.set("smtp_user", updates.smtpUser);
-    if (updates.smtpPass !== void 0) memoryStore.adminSettings.set("smtp_pass", updates.smtpPass);
-    if (updates.smtpFromEmail !== void 0) memoryStore.adminSettings.set("smtp_from_email", updates.smtpFromEmail);
-    if (updates.googleDriveClientId !== void 0) memoryStore.adminSettings.set("google_drive_client_id", updates.googleDriveClientId);
-    if (updates.googleDriveClientSecret !== void 0) memoryStore.adminSettings.set("google_drive_client_secret", updates.googleDriveClientSecret);
-    if (updates.googleDriveRefreshToken !== void 0) memoryStore.adminSettings.set("google_drive_refresh_token", updates.googleDriveRefreshToken);
-    if (updates.googleDriveFolderId !== void 0) memoryStore.adminSettings.set("google_drive_folder_id", updates.googleDriveFolderId);
-    return res.status(200).json({ success: true, message: "Settings successfully updated." });
+    if (updates.emailProvider !== void 0) savePromises.push(saveAdminSettingToDb("email_provider", updates.emailProvider));
+    if (updates.resendApiKey !== void 0) savePromises.push(saveAdminSettingToDb("resend_api_key", updates.resendApiKey));
+    if (updates.resendFromEmail !== void 0) savePromises.push(saveAdminSettingToDb("resend_from_email", updates.resendFromEmail));
+    if (updates.smtpHost !== void 0) savePromises.push(saveAdminSettingToDb("smtp_host", updates.smtpHost));
+    if (updates.smtpPort !== void 0) savePromises.push(saveAdminSettingToDb("smtp_port", parseInt(updates.smtpPort, 10)));
+    if (updates.smtpSecure !== void 0) savePromises.push(saveAdminSettingToDb("smtp_secure", Boolean(updates.smtpSecure)));
+    if (updates.smtpUser !== void 0) savePromises.push(saveAdminSettingToDb("smtp_user", updates.smtpUser));
+    if (updates.smtpPass !== void 0) savePromises.push(saveAdminSettingToDb("smtp_pass", updates.smtpPass));
+    if (updates.smtpFromEmail !== void 0) savePromises.push(saveAdminSettingToDb("smtp_from_email", updates.smtpFromEmail));
+    if (updates.googleDriveClientId !== void 0) savePromises.push(saveAdminSettingToDb("google_drive_client_id", updates.googleDriveClientId));
+    if (updates.googleDriveClientSecret !== void 0) savePromises.push(saveAdminSettingToDb("google_drive_client_secret", updates.googleDriveClientSecret));
+    if (updates.googleDriveRefreshToken !== void 0) savePromises.push(saveAdminSettingToDb("google_drive_refresh_token", updates.googleDriveRefreshToken));
+    if (updates.googleDriveFolderId !== void 0) savePromises.push(saveAdminSettingToDb("google_drive_folder_id", updates.googleDriveFolderId));
+    await Promise.all(savePromises);
+    return res.status(200).json({ success: true, message: "Settings successfully updated and saved to database." });
   }
   return res.status(405).json({ success: false, error: "Method not allowed" });
 }

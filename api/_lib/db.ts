@@ -146,6 +146,9 @@ function initMemoryStore() {
   memoryStore.adminSettings.set('free_initial_messages', 3);
   memoryStore.adminSettings.set('free_distinct_recipients', 3);
   memoryStore.adminSettings.set('free_replies', 3);
+  memoryStore.adminSettings.set('hourly_pass_cost', 500);
+  memoryStore.adminSettings.set('three_day_pass_cost', 1500);
+  memoryStore.adminSettings.set('weekly_pass_cost', 3000);
   memoryStore.adminSettings.set('pay_per_message_cost', 150);
   memoryStore.adminSettings.set('contact_unlock_cost', 2000);
   memoryStore.adminSettings.set('default_currency', 'RWF');
@@ -443,3 +446,110 @@ export async function query(sql: string, params: any[] = []): Promise<any> {
 export function getDbPool(): pg.Pool | mysql.Pool | null {
   return pgPool || mysqlPool;
 }
+
+let settingsTableInitialized = false;
+
+/**
+ * Ensures admin_settings table exists in connected DB
+ */
+export async function ensureAdminSettingsTable(): Promise<void> {
+  if (settingsTableInitialized) return;
+  try {
+    if (pgPool) {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS admin_settings (
+          "key" VARCHAR(100) NOT NULL PRIMARY KEY,
+          "value" TEXT NOT NULL,
+          "description" TEXT,
+          "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      settingsTableInitialized = true;
+    } else if (mysqlPool) {
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS \`admin_settings\` (
+          \`key\` VARCHAR(100) NOT NULL PRIMARY KEY,
+          \`value\` JSON NOT NULL,
+          \`description\` TEXT,
+          \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      settingsTableInitialized = true;
+    }
+  } catch (err) {
+    console.warn('⚠️ ensureAdminSettingsTable warning:', err);
+  }
+}
+
+/**
+ * Loads all settings from DB table and hydrates memoryStore.adminSettings
+ */
+export async function loadAdminSettingsFromDb(): Promise<Map<string, any>> {
+  await ensureAdminSettingsTable();
+  try {
+    let rows: any[] = [];
+    if (pgPool) {
+      const res = await pgPool.query('SELECT "key", "value" FROM admin_settings');
+      rows = res.rows || [];
+    } else if (mysqlPool) {
+      const [res] = await mysqlPool.query('SELECT `key`, `value` FROM `admin_settings`');
+      if (Array.isArray(res)) rows = res;
+    }
+
+    for (const r of rows) {
+      const k = r.key ?? r.KEY;
+      let v = r.value ?? r.VALUE;
+      if (typeof v === 'string') {
+        try {
+          v = JSON.parse(v);
+        } catch {
+          // keep as raw string
+        }
+      }
+      if (k !== undefined && v !== undefined) {
+        memoryStore.adminSettings.set(k, v);
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ loadAdminSettingsFromDb warning:', err);
+  }
+  return memoryStore.adminSettings;
+}
+
+/**
+ * Saves a setting to memoryStore and persists it to PostgreSQL or MySQL admin_settings table
+ */
+export async function saveAdminSettingToDb(key: string, value: any): Promise<boolean> {
+  memoryStore.adminSettings.set(key, value);
+  await ensureAdminSettingsTable();
+  const jsonVal = JSON.stringify(value);
+  try {
+    if (pgPool) {
+      await pgPool.query(
+        `INSERT INTO admin_settings ("key", "value", "updated_at")
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value", "updated_at" = CURRENT_TIMESTAMP`,
+        [key, jsonVal]
+      );
+      return true;
+    } else if (mysqlPool) {
+      await mysqlPool.query(
+        `INSERT INTO \`admin_settings\` (\`key\`, \`value\`)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`), \`updated_at\` = CURRENT_TIMESTAMP`,
+        [key, jsonVal]
+      );
+      return true;
+    }
+  } catch (err) {
+    console.error(`⚠️ Failed to persist admin setting "${key}" to DB:`, err);
+    return false;
+  }
+  return true;
+}
+
+// Background startup load of admin settings from database
+setTimeout(() => {
+  loadAdminSettingsFromDb().catch(() => {});
+}, 500);
+
