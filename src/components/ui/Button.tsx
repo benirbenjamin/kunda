@@ -1,7 +1,8 @@
 import React from 'react';
+import { cn } from '../../lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'white';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   children: React.ReactNode;
@@ -30,11 +31,12 @@ export const Button: React.FC<ButtonProps> = ({
     outline: 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 focus:ring-slate-300',
     ghost: 'bg-transparent hover:bg-rose-50 text-slate-600 hover:text-rose-600 focus:ring-rose-300',
     danger: 'bg-red-500 hover:bg-red-600 text-white focus:ring-red-400 shadow-sm active:scale-[0.98]',
+    white: 'bg-white hover:bg-rose-50 text-rose-600 font-extrabold shadow-xl focus:ring-rose-200 border-none active:scale-[0.98]',
   };
 
   return (
     <button
-      className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
+      className={cn(baseStyles, sizeStyles[size], variantStyles[variant], className)}
       disabled={disabled || loading}
       {...props}
     >

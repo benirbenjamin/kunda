@@ -23,8 +23,23 @@ export default async function handler(req: any, res: any) {
     let user = null;
     if (token) {
       user = memoryStore.users.find((u) => u.resetToken === token);
+      if (!user) {
+        const uRes = await query('SELECT * FROM users WHERE reset_token = $1', [token]);
+        if (uRes?.rows?.[0]) {
+          user = uRes.rows[0];
+          memoryStore.users.push(user);
+        }
+      }
     } else if (email) {
-      user = memoryStore.users.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
+      const normalizedEmail = email.toLowerCase().trim();
+      user = memoryStore.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+      if (!user) {
+        const uRes = await query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [normalizedEmail]);
+        if (uRes?.rows?.[0]) {
+          user = uRes.rows[0];
+          memoryStore.users.push(user);
+        }
+      }
     }
 
     if (!user) {
@@ -32,13 +47,17 @@ export default async function handler(req: any, res: any) {
     }
 
     // Check expiration
-    if (user.resetExpiresAt && new Date(user.resetExpiresAt) < new Date()) {
+    const resetExpiresAt = user.resetExpiresAt || user.reset_expires_at;
+    if (resetExpiresAt && new Date(resetExpiresAt) < new Date()) {
       return res.status(400).json({ success: false, error: 'Reset code has expired. Please request a new one.' });
     }
 
     // Verify code or token
-    const isCodeMatch = code && user.resetCode === code.toString().trim();
-    const isTokenMatch = token && user.resetToken === token;
+    const storedCode = (user.resetCode || user.reset_code)?.toString().trim();
+    const storedToken = user.resetToken || user.reset_token;
+
+    const isCodeMatch = code && storedCode === code.toString().trim();
+    const isTokenMatch = token && storedToken === token;
 
     if (!isCodeMatch && !isTokenMatch) {
       return res.status(400).json({ success: false, error: 'Invalid reset code. Please check your email.' });
@@ -51,8 +70,8 @@ export default async function handler(req: any, res: any) {
     user.resetToken = null;
     user.resetExpiresAt = null;
 
-    // Update in PostgreSQL if connected
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]);
+    // Update in DB
+    await query('UPDATE users SET password_hash = $1, reset_code = NULL, reset_token = NULL, reset_expires_at = NULL WHERE id = $2', [newHash, user.id]).catch(() => {});
 
     return res.status(200).json({
       success: true,

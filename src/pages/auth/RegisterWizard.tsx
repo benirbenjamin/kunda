@@ -23,9 +23,51 @@ import {
   BookOpen,
   Trash2,
   X,
+  Globe,
+  Smile,
 } from 'lucide-react';
 
 import { api, getErrorMessage } from '../../lib/api';
+
+// Curated authentic African portraits for representative matching & avatar suggestion
+export const AFRICAN_AVATAR_SUGGESTIONS = [
+  {
+    id: 'afr-1',
+    label: 'Aline (Kigali)',
+    gender: 'woman',
+    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    id: 'afr-2',
+    label: 'Eric (Kigali)',
+    gender: 'man',
+    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    id: 'afr-3',
+    label: 'Diane (Rubavu)',
+    gender: 'woman',
+    imageUrl: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    id: 'afr-4',
+    label: 'Jean-Claude (Musanze)',
+    gender: 'man',
+    imageUrl: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    id: 'afr-5',
+    label: 'Grace (Huye)',
+    gender: 'woman',
+    imageUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    id: 'afr-6',
+    label: 'Patrick (Kigali)',
+    gender: 'man',
+    imageUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
+  },
+];
 
 export const RegisterWizard: React.FC = () => {
   const { login } = useAuth();
@@ -97,26 +139,44 @@ export const RegisterWizard: React.FC = () => {
     phone: '',
     preferredLanguage: language || 'en',
 
-    // Step 2: Goals & Preferences
+    // Step 2: Goals, Rich Profile Details & Matching Preferences
     relationshipIntention: 'serious_relationship',
-    minAgePref: 21,
-    maxAgePref: 40,
+    friendshipRange: 'relationship_and_friends', // connection range
+    minAgePref: 22,
+    maxAgePref: 38,
     datingScope: 'local',
     height: 168,
     occupation: '',
-    education: 'University Degree',
-    languages: ['English', 'Kinyarwanda'],
+    education: "Bachelor's Degree",
+    religion: 'Christian / Protestant',
+    childrenStatus: 'wants_children',
+    smokingHabit: 'never',
+    drinkingHabit: 'socially',
+    languagesKnown: ['Kinyarwanda', 'English'],
+    partnerPreferredLanguages: ['Kinyarwanda', 'English'],
     interests: ['Coffee & Tea Tasting', 'Hiking in 1000 Hills', 'Tech & Entrepreneurship'] as string[],
     appearanceSkinTone: 'warm_deep',
     bio: '',
 
     // Step 3: Photos & Consent
-    primaryPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+    primaryPhoto: AFRICAN_AVATAR_SUGGESTIONS[0].imageUrl,
     galleryPhotos: [
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
+      AFRICAN_AVATAR_SUGGESTIONS[2].imageUrl,
     ],
     termsAccepted: false,
   });
+
+  const availableLanguagesList = [
+    'Kinyarwanda',
+    'English',
+    'Français',
+    'Swahili',
+    'Kirundi',
+    'Luganda',
+    'Lingala',
+    'Arabic',
+    'German',
+  ];
 
   const availableInterests = [
     'Traditional Dance & Music',
@@ -129,23 +189,25 @@ export const RegisterWizard: React.FC = () => {
     'Tech & Entrepreneurship',
     'Travel & Road Trips',
     'Faith & Spirituality',
+    'Community & Volunteering',
+    'Music & Concerts',
   ];
 
-  // Stock adult reference sample cards (licensed adult stock photography)
+  // Stock African adult reference sample cards
   const appearanceSamples = [
     {
       id: 'warm_deep',
-      label: 'Deep & Rich Tone',
+      label: 'Deep Melanin Tone',
       imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     },
     {
       id: 'warm_golden',
-      label: 'Warm Golden Tone',
+      label: 'Warm Bronze Tone',
       imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
     },
     {
       id: 'caramel',
-      label: 'Caramel & Bronze',
+      label: 'Caramel & Sun-kissed',
       imageUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=80',
     },
   ];
@@ -163,6 +225,30 @@ export const RegisterWizard: React.FC = () => {
         phoneCode: c.callingCode,
       });
     }
+  };
+
+  const toggleLanguageKnown = (lang: string) => {
+    setFormData((prev) => {
+      const exists = prev.languagesKnown.includes(lang);
+      if (exists) {
+        if (prev.languagesKnown.length === 1) return prev; // Keep at least one
+        return { ...prev, languagesKnown: prev.languagesKnown.filter((l) => l !== lang) };
+      } else {
+        return { ...prev, languagesKnown: [...prev.languagesKnown, lang] };
+      }
+    });
+  };
+
+  const togglePartnerLanguage = (lang: string) => {
+    setFormData((prev) => {
+      const exists = prev.partnerPreferredLanguages.includes(lang);
+      if (exists) {
+        if (prev.partnerPreferredLanguages.length === 1) return prev;
+        return { ...prev, partnerPreferredLanguages: prev.partnerPreferredLanguages.filter((l) => l !== lang) };
+      } else {
+        return { ...prev, partnerPreferredLanguages: [...prev.partnerPreferredLanguages, lang] };
+      }
+    });
   };
 
   const toggleInterest = (interest: string) => {
@@ -205,8 +291,12 @@ export const RegisterWizard: React.FC = () => {
 
   const handleNextStep2 = () => {
     setError(null);
-    if (!formData.bio || formData.bio.trim().length < 10) {
-      setError('Please write at least a short sentence about yourself.');
+    if (!formData.bio || formData.bio.trim().length < 8) {
+      setError('Please write at least a brief bio introducing who you are.');
+      return;
+    }
+    if (formData.minAgePref > formData.maxAgePref) {
+      setError('Minimum age preference cannot be higher than maximum age.');
       return;
     }
     setStep(3);
@@ -228,6 +318,8 @@ export const RegisterWizard: React.FC = () => {
     try {
       const res = await api.post('/auth/register', {
         ...formData,
+        languages: formData.languagesKnown,
+        partnerLanguages: formData.partnerPreferredLanguages,
         photos: [formData.primaryPhoto, ...formData.galleryPhotos],
       });
 
@@ -265,13 +357,13 @@ export const RegisterWizard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
+    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto pb-24 md:pb-12">
       {/* Wizard Progress Bar */}
       <div className="mb-8 space-y-4">
         <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider">
           <span className={step >= 1 ? 'text-rose-600' : ''}>1. {t('wizard.step1')}</span>
-          <span className={step >= 2 ? 'text-rose-600' : ''}>2. {t('wizard.step2')}</span>
-          <span className={step >= 3 ? 'text-rose-600' : ''}>3. {t('wizard.step3')}</span>
+          <span className={step >= 2 ? 'text-rose-600' : ''}>2. Goals & Deep Profile</span>
+          <span className={step >= 3 ? 'text-rose-600' : ''}>3. Photo & Review</span>
         </div>
         <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
           <div
@@ -329,7 +421,7 @@ export const RegisterWizard: React.FC = () => {
                 required
                 value={formData.displayName}
                 onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                placeholder="e.g. Diane or Keza"
+                placeholder="e.g. Diane, Keza, or Eric"
               />
 
               <Input
@@ -418,28 +510,27 @@ export const RegisterWizard: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                   {t('wizard.city')}
                 </label>
-                <input
-                  list="city-options"
+                <select
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="e.g. Kigali or Rubavu"
                   className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-rose-500"
-                />
-                <datalist id="city-options">
-                  {selectedCountryObj.cities.map((ct) => (
-                    <option key={ct} value={ct} />
+                >
+                  {selectedCountryObj.cities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
 
-            {/* Phone with Country Code & Privacy notice */}
+            {/* Phone Number */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                 {t('wizard.phone')}
               </label>
               <div className="flex gap-2">
-                <span className="inline-flex items-center px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
+                <span className="inline-flex items-center px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold">
                   {formData.phoneCode}
                 </span>
                 <input
@@ -456,48 +547,265 @@ export const RegisterWizard: React.FC = () => {
               </p>
             </div>
 
-            <Button onClick={handleNextStep1} className="w-full py-3">
+            <Button onClick={handleNextStep1} className="w-full py-3 shadow-md shadow-rose-200">
               {t('wizard.nextBtn')}
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
         )}
 
-        {/* STEP 2: GOALS & MATCHING PREFERENCES */}
+        {/* STEP 2: GOALS, DEEP PROFILE & MATCHING PREFERENCES */}
         {step === 2 && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-black text-slate-900">{t('wizard.step2')}</h2>
+              <h2 className="text-2xl font-black text-slate-900">Goals, Preferences & More Details</h2>
               <p className="text-xs text-slate-500 mt-1">
-                Help our compatibility engine recommend the most suitable matches for you.
+                The more details you specify, the easier our compatibility engine matches you with the ideal person.
               </p>
             </div>
 
-            {/* Relationship Intention */}
+            {/* Relationship Intention & Connection Range */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                {t('wizard.relationshipIntention')}
+                Primary Relationship Goal
               </label>
               <div className="grid grid-cols-2 gap-2.5">
                 {[
-                  { id: 'serious_relationship', label: t('wizard.seriousRelationship') },
-                  { id: 'marriage', label: t('wizard.marriage') },
-                  { id: 'friendship', label: t('wizard.friendship') },
-                  { id: 'casual_dating', label: t('wizard.casualDating') },
+                  { id: 'serious_relationship', label: '💍 Serious Relationship', desc: 'Long-term loving commitment' },
+                  { id: 'marriage', label: '💒 Marriage & Family', desc: 'Ready to settle down and build a home' },
+                  { id: 'friendship', label: '✨ Meaningful Friendship', desc: 'Deep companionship & shared laughs' },
+                  { id: 'casual_dating', label: '☕ Dating & Chemistry', desc: 'Getting to know someone organically' },
                 ].map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setFormData({ ...formData, relationshipIntention: item.id })}
-                    className={`p-3 rounded-xl border text-xs font-semibold text-left transition-all ${
+                    className={`p-3 rounded-2xl border text-xs font-semibold text-left transition-all ${
                       formData.relationshipIntention === item.id
-                        ? 'border-rose-500 bg-rose-50 text-rose-700 ring-2 ring-rose-500/20'
+                        ? 'border-rose-500 bg-rose-50 text-rose-800 ring-2 ring-rose-500/20 shadow-sm'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className="font-bold text-slate-900">{item.label}</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">{item.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Range of Connection Desired */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                What Range of Connection Are You Open To?
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'exclusive_romance', label: 'Exclusive Romance Only' },
+                  { id: 'relationship_and_friends', label: 'Romance & Good Friends' },
+                  { id: 'close_friends_first', label: 'Best Friends First' },
+                  { id: 'travel_companion', label: 'Travel & Activity Partner' },
+                  { id: 'networking_dating', label: 'Ambitious Power Couple' },
+                  { id: 'open_minded', label: 'Open to Beautiful Surprises' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, friendshipRange: item.id })}
+                    className={`px-3 py-2 rounded-xl border text-xs font-medium text-center transition-all ${
+                      formData.friendshipRange === item.id
+                        ? 'bg-violet-600 text-white border-violet-600 font-bold shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     {item.label}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Partner Age Range Preference */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                Partner Age Range Preference
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">Minimum Age ({formData.minAgePref} yrs)</label>
+                  <input
+                    type="range"
+                    min="18"
+                    max="65"
+                    value={formData.minAgePref}
+                    onChange={(e) => setFormData({ ...formData, minAgePref: parseInt(e.target.value, 10) })}
+                    className="w-full accent-rose-600 cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">Maximum Age ({formData.maxAgePref} yrs)</label>
+                  <input
+                    type="range"
+                    min="18"
+                    max="75"
+                    value={formData.maxAgePref}
+                    onChange={(e) => setFormData({ ...formData, maxAgePref: parseInt(e.target.value, 10) })}
+                    className="w-full accent-rose-600 cursor-pointer"
+                  />
+                </div>
+              </div>
+              <div className="text-center text-xs font-bold text-rose-600">
+                Searching for partners aged {formData.minAgePref} to {formData.maxAgePref} years old
+              </div>
+            </div>
+
+            {/* Languages Known (Multi-select) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-rose-500" /> Languages You Speak (Select all that apply)
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {availableLanguagesList.map((lang) => {
+                  const selected = formData.languagesKnown.includes(lang);
+                  return (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => toggleLanguageKnown(lang)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                        selected
+                          ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {selected ? '✓ ' : ''}{lang}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Languages Partner Might Speak (Multi-select) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-violet-500" /> Languages You Want Partner to Speak
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {availableLanguagesList.map((lang) => {
+                  const selected = formData.partnerPreferredLanguages.includes(lang);
+                  return (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => togglePartnerLanguage(lang)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                        selected
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {selected ? '✓ ' : ''}{lang}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Education, Occupation & Faith */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Education Level
+                </label>
+                <select
+                  value={formData.education}
+                  onChange={(e) => setFormData({ ...formData, education: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="High School">High School</option>
+                  <option value="Diploma / College">Diploma / College</option>
+                  <option value="Bachelor's Degree">Bachelor's Degree</option>
+                  <option value="Master's Degree">Master's Degree</option>
+                  <option value="Doctorate / PhD">Doctorate / PhD</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Occupation / Career
+                </label>
+                <input
+                  type="text"
+                  value={formData.occupation}
+                  onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+                  placeholder="e.g. Software Engineer, Doctor, Entrepreneur"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Faith / Religion
+                </label>
+                <select
+                  value={formData.religion}
+                  onChange={(e) => setFormData({ ...formData, religion: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="Christian / Protestant">Christian (Protestant)</option>
+                  <option value="Christian / Catholic">Christian (Catholic)</option>
+                  <option value="Christian / Adventist">Christian (Adventist)</option>
+                  <option value="Muslim">Muslim</option>
+                  <option value="Spiritual / Traditional">Spiritual / Traditional</option>
+                  <option value="Agnostic / Non-religious">Agnostic / Non-religious</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Height, Children & Lifestyle */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Height: {formData.height} cm
+                </label>
+                <input
+                  type="range"
+                  min="145"
+                  max="210"
+                  value={formData.height}
+                  onChange={(e) => setFormData({ ...formData, height: parseInt(e.target.value, 10) })}
+                  className="w-full accent-rose-600 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Children
+                </label>
+                <select
+                  value={formData.childrenStatus}
+                  onChange={(e) => setFormData({ ...formData, childrenStatus: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="wants_children">Wants Children</option>
+                  <option value="does_not_want_children">Doesn't Want Children</option>
+                  <option value="has_children_wants_more">Has Children & Wants More</option>
+                  <option value="has_children_content">Has Children & Content</option>
+                  <option value="open_to_children">Open to Discussion</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Drinking & Smoking
+                </label>
+                <select
+                  value={formData.drinkingHabit}
+                  onChange={(e) => setFormData({ ...formData, drinkingHabit: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="never">Non-Drinker / Non-Smoker</option>
+                  <option value="socially">Social Drinker</option>
+                  <option value="regularly">Regular Drinker</option>
+                </select>
               </div>
             </div>
 
@@ -510,7 +818,7 @@ export const RegisterWizard: React.FC = () => {
                 rows={3}
                 value={formData.bio}
                 onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                placeholder={t('wizard.bioPlaceholder')}
+                placeholder="Share what makes you happy, your values, your ideal weekend, and what you cherish in a partner..."
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-rose-500"
               />
             </div>
@@ -541,12 +849,12 @@ export const RegisterWizard: React.FC = () => {
               </div>
             </div>
 
-            {/* Sample Appearance Preference Preview (Licensed Stock Adult Photos) */}
+            {/* Sample Appearance Preference Preview (African Photography) */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                {t('wizard.skinTonePref')}
+                Appearance & Melanin Tone Reference
               </label>
-              <p className="text-[11px] text-slate-400 mb-2.5">{t('wizard.skinToneNotice')}</p>
+              <p className="text-[11px] text-slate-400 mb-2.5">Authentic representative African references for aesthetic preference.</p>
               <div className="grid grid-cols-3 gap-3">
                 {appearanceSamples.map((samp) => (
                   <div
@@ -561,7 +869,7 @@ export const RegisterWizard: React.FC = () => {
                     <img src={samp.imageUrl} alt={samp.label} className="w-full h-24 object-cover" />
                     <div className="p-1.5 text-center bg-white">
                       <span className="text-[10px] font-bold text-slate-700 block">{samp.label}</span>
-                      <span className="text-[9px] text-slate-400">Stock Reference</span>
+                      <span className="text-[9px] text-slate-400">African Reference</span>
                     </div>
                   </div>
                 ))}
@@ -573,7 +881,7 @@ export const RegisterWizard: React.FC = () => {
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 {t('wizard.prevBtn')}
               </Button>
-              <Button onClick={handleNextStep2} className="w-2/3">
+              <Button onClick={handleNextStep2} className="w-2/3 shadow-md shadow-rose-200">
                 {t('wizard.nextBtn')}
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
@@ -581,47 +889,68 @@ export const RegisterWizard: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 3: PHOTOS & PUBLISHING */}
+        {/* STEP 3: PHOTOS & PUBLISHING WITH AFRICAN SUGGESTIONS */}
         {step === 3 && (
           <form onSubmit={handleFinalSubmit} className="space-y-6">
             <div>
               <h2 className="text-2xl font-black text-slate-900">{t('wizard.step3')}</h2>
-              <p className="text-xs text-slate-500 mt-1">{t('wizard.photosNotice')}</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Upload your authentic photos, or pick from our representative African community portraits to get started instantly.
+              </p>
+            </div>
+
+            {/* African Community Suggestion Gallery */}
+            <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                  <Smile className="w-4 h-4 text-rose-600" /> Quick-Select African Member Avatar
+                </span>
+                <span className="text-[11px] text-rose-600 font-semibold">Click any to set as primary photo</span>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+                {AFRICAN_AVATAR_SUGGESTIONS.map((sug) => (
+                  <button
+                    key={sug.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, primaryPhoto: sug.imageUrl })}
+                    className={`group relative rounded-2xl overflow-hidden border-2 transition-all ${
+                      formData.primaryPhoto === sug.imageUrl
+                        ? 'border-rose-600 ring-2 ring-rose-500/30 scale-105 shadow-md'
+                        : 'border-slate-200 hover:border-rose-300'
+                    }`}
+                  >
+                    <img src={sug.imageUrl} alt={sug.label} className="w-full h-20 object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[9px] py-0.5 text-center truncate px-1">
+                      {sug.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Primary Photo Preview & Upload */}
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                {t('wizard.primaryPhoto')}
+                {t('wizard.primaryPhoto')} (Selected Picture)
               </label>
               <div className="flex items-center gap-4">
                 <div className="relative group shrink-0">
                   <img
                     src={formData.primaryPhoto}
                     alt="Primary profile preview"
-                    className="w-20 h-20 rounded-2xl object-cover border-2 border-rose-500 shadow-sm"
+                    className="w-24 h-24 rounded-2xl object-cover border-2 border-rose-500 shadow-md"
                   />
-                  {formData.primaryPhoto && !formData.primaryPhoto.includes('photo-1534528741775-53994a69daeb') && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, primaryPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80' })}
-                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 shadow hover:bg-red-600 transition-colors"
-                      title="Delete uploaded photo"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
                 <div className="flex-1 space-y-2">
                   <Input
                     value={formData.primaryPhoto}
                     onChange={(e) => setFormData({ ...formData, primaryPhoto: e.target.value })}
-                    placeholder="Enter photo URL or choose a file below"
+                    placeholder="Enter custom image URL or choose file below"
                   />
                   <div className="flex items-center gap-2">
                     <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all">
                       <UploadCloud className="w-3.5 h-3.5" />
-                      <span>{uploadingPhoto ? 'Uploading photo...' : 'Choose Photo File'}</span>
+                      <span>{uploadingPhoto ? 'Uploading to Drive...' : 'Upload from Device'}</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -646,12 +975,17 @@ export const RegisterWizard: React.FC = () => {
               </p>
               <p>
                 Seeking:{' '}
-                <span className="text-rose-600 font-semibold">
-                  {formData.relationshipIntention.replace('_', ' ')}
+                <span className="text-rose-600 font-semibold capitalize">
+                  {formData.relationshipIntention.replace(/_/g, ' ')}
                 </span>
+                {' • '}
+                Ages {formData.minAgePref} - {formData.maxAgePref}
               </p>
               <p>
-                Interests: {formData.interests.slice(0, 3).join(', ')}
+                Languages: <strong>{formData.languagesKnown.join(', ')}</strong> (Seeking: {formData.partnerPreferredLanguages.join(', ')})
+              </p>
+              <p>
+                Interests: {formData.interests.slice(0, 4).join(', ')}
               </p>
             </div>
 
@@ -663,9 +997,9 @@ export const RegisterWizard: React.FC = () => {
                 required
                 checked={formData.termsAccepted}
                 onChange={(e) => setFormData({ ...formData, termsAccepted: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
               />
-              <label htmlFor="terms" className="text-xs text-slate-600 leading-relaxed">
+              <label htmlFor="terms" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
                 {t('wizard.termsAgree')}
               </label>
             </div>
@@ -675,7 +1009,7 @@ export const RegisterWizard: React.FC = () => {
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 {t('wizard.prevBtn')}
               </Button>
-              <Button type="submit" loading={loading} className="w-2/3 py-3 shadow-md shadow-rose-200">
+              <Button type="submit" loading={loading} className="w-2/3 py-3 shadow-lg shadow-rose-200">
                 {t('wizard.publishBtn')}
               </Button>
             </div>

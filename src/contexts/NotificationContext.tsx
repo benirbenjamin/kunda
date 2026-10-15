@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { api } from '../lib/api';
+import { MessageCircle, Heart, X, Bell, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export interface NotificationItem {
   id: string;
@@ -12,6 +14,13 @@ export interface NotificationItem {
   createdAt: string;
 }
 
+interface PushToastItem {
+  id: string;
+  title: string;
+  body: string;
+  linkUrl?: string;
+}
+
 interface NotificationContextType {
   notifications: NotificationItem[];
   unreadCount: number;
@@ -21,6 +30,8 @@ interface NotificationContextType {
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
+  requestPushPermission: () => Promise<void>;
+  pushPermissionStatus: NotificationPermission | 'unsupported';
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -28,15 +39,43 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { token, isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [activePushToast, setActivePushToast] = useState<PushToastItem | null>(null);
+  const [pushPermissionStatus, setPushPermissionStatus] = useState<NotificationPermission | 'unsupported'>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'unsupported';
+  });
+
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
     return localStorage.getItem('kunda_sound') !== 'false';
   });
 
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadDoneRef = useRef<boolean>(false);
+  const toastTimeoutRef = useRef<any>(null);
 
   const setSoundEnabled = (enabled: boolean) => {
     setSoundEnabledState(enabled);
     localStorage.setItem('kunda_sound', String(enabled));
+  };
+
+  /**
+   * Request browser push notification permission directly without external dependencies
+   */
+  const requestPushPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const permission = await Notification.requestPermission();
+        setPushPermissionStatus(permission);
+        if (permission === 'granted') {
+          playNotificationSound();
+        }
+      } catch (err) {
+        console.warn('Push notification permission prompt notice:', err);
+      }
+    }
   };
 
   /**
@@ -66,19 +105,19 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const gain1 = ctx.createGain();
       osc1.type = 'sine';
       osc1.frequency.setValueAtTime(659.25, now);
-      gain1.gain.setValueAtTime(0.12, now);
+      gain1.gain.setValueAtTime(0.15, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
       osc1.start(now);
       osc1.stop(now + 0.35);
 
-      // Note 2: G#5 (830.61 Hz)
+      // Note 2: B5 (987.77 Hz) - Bright, uplifting tone
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(830.61, now + 0.12);
-      gain2.gain.setValueAtTime(0.15, now + 0.12);
+      osc2.frequency.setValueAtTime(987.77, now + 0.12);
+      gain2.gain.setValueAtTime(0.18, now + 0.12);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
@@ -89,12 +128,70 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  /**
+   * Dispatches both Native HTML5 Push Notification and In-App Push Toast
+   */
+  const triggerPushAlert = (item: NotificationItem) => {
+    // 1. Play sound chime
+    playNotificationSound();
+
+    // 2. Native Browser Push Notification
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        const push = new Notification(item.title, {
+          body: item.body,
+          icon: '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: item.id,
+        });
+
+        push.onclick = () => {
+          window.focus();
+          if (item.linkUrl) {
+            window.location.href = item.linkUrl;
+          }
+        };
+      } catch (e) {
+        console.warn('Native push error:', e);
+      }
+    }
+
+    // 3. In-App Floating Push Toast
+    setActivePushToast({
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      linkUrl: item.linkUrl,
+    });
+
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setActivePushToast(null);
+    }, 6000);
+  };
+
   const refreshNotifications = async () => {
     if (!token) return;
     try {
       const res = await api.get('/notifications');
-      if (res.data.success && res.data.notifications) {
-        setNotifications(res.data.notifications);
+      if (res.data.success && Array.isArray(res.data.notifications)) {
+        const fetched: NotificationItem[] = res.data.notifications;
+        setNotifications(fetched);
+
+        if (!initialLoadDoneRef.current) {
+          // Record existing notification IDs on first load to prevent spamming old alerts
+          fetched.forEach((n) => seenIdsRef.current.add(n.id));
+          initialLoadDoneRef.current = true;
+        } else {
+          // Check for any newly arrived unread notifications
+          for (const n of fetched) {
+            if (!n.isRead && !seenIdsRef.current.has(n.id)) {
+              seenIdsRef.current.add(n.id);
+              triggerPushAlert(n);
+              break; // Trigger for the latest new notification
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Notification fetch error:', err);
@@ -103,11 +200,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     if (isAuthenticated) {
+      // Auto-prompt browser notification permission on login if default
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          setTimeout(() => {
+            requestPushPermission();
+          }, 2000);
+        }
+      }
+
       refreshNotifications();
-      const interval = setInterval(refreshNotifications, 10000); // 10s polling
+      const interval = setInterval(refreshNotifications, 5000); // 5s fast polling for real-time responsiveness
       return () => clearInterval(interval);
+    } else {
+      initialLoadDoneRef.current = false;
+      seenIdsRef.current.clear();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, token]);
 
   const markAsRead = async (id: string) => {
     if (!token) return;
@@ -142,9 +251,48 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         markAsRead,
         markAllAsRead,
         refreshNotifications,
+        requestPushPermission,
+        pushPermissionStatus,
       }}
     >
       {children}
+
+      {/* In-App Floating Push Notification Toast Banner */}
+      {activePushToast && (
+        <div className="fixed top-4 right-4 z-50 max-w-sm w-full bg-white/95 backdrop-blur-md rounded-2xl border border-rose-100 shadow-float p-3.5 animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 to-violet-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <MessageCircle className="w-5 h-5 fill-white/20" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-900 truncate">{activePushToast.title}</h4>
+                <button
+                  onClick={() => setActivePushToast(null)}
+                  className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 line-clamp-2 mt-0.5">{activePushToast.body}</p>
+
+              {activePushToast.linkUrl && (
+                <div className="pt-2 flex justify-end">
+                  <a
+                    href={activePushToast.linkUrl}
+                    onClick={() => setActivePushToast(null)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg transition-colors"
+                  >
+                    <span>View & Reply</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </NotificationContext.Provider>
   );
 };

@@ -195,30 +195,42 @@ export const Discover: React.FC = () => {
               </div>
             </div>
 
-            {/* Action Buttons: Pass, Superlike, Like */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-6">
+            {/* Action Buttons: Pass, Message, Like, Superlike */}
+            <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
               <button
                 onClick={() => handleInteract('pass')}
-                className="w-14 h-14 rounded-full border-2 border-slate-200 bg-white text-slate-400 hover:text-slate-600 hover:border-slate-300 flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all"
+                className="w-12 h-12 rounded-full border-2 border-slate-200 bg-white text-slate-400 hover:text-slate-600 hover:border-slate-300 flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all"
                 title="Pass"
               >
-                <X className="w-7 h-7" />
+                <X className="w-6 h-6" />
               </button>
 
               <button
                 onClick={() => handleInteract('super_like')}
-                className="w-12 h-12 rounded-full border-2 border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all"
+                className="w-11 h-11 rounded-full border-2 border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all"
                 title="Super Like"
               >
                 <Star className="w-5 h-5 fill-violet-600" />
               </button>
 
+              {/* Start Messaging Button */}
+              <Link to={`/dashboard/messages?user=${currentProfile.userId}`}>
+                <button
+                  type="button"
+                  className="px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 via-rose-600 to-violet-600 hover:opacity-95 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-rose-200 hover:scale-105 active:scale-95 transition-all"
+                  title={`Start chatting with ${currentProfile.displayName}`}
+                >
+                  <MessageCircle className="w-4 h-4 fill-white" />
+                  <span>Start Messaging</span>
+                </button>
+              </Link>
+
               <button
                 onClick={() => handleInteract('like')}
-                className="w-16 h-16 rounded-full bg-gradient-to-tr from-rose-500 to-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-200 hover:scale-110 active:scale-95 transition-all"
+                className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-rose-500 to-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-200 hover:scale-110 active:scale-95 transition-all p-3.5"
                 title="Like"
               >
-                <Heart className="w-8 h-8 fill-white" />
+                <Heart className="w-7 h-7 fill-white" />
               </button>
             </div>
           </div>
@@ -254,9 +266,16 @@ export const Discover: React.FC = () => {
               </ul>
             </div>
 
-            <Button onClick={() => setBreakdownModalOpen(false)} className="w-full">
-              Close Breakdown
-            </Button>
+            <div className="flex gap-2.5 pt-2">
+              <Button variant="outline" onClick={() => setBreakdownModalOpen(false)} className="w-1/2">
+                Close
+              </Button>
+              <Link to={`/dashboard/messages?user=${currentProfile.userId}`} className="w-1/2">
+                <Button className="w-full">
+                  <MessageCircle className="w-4 h-4 mr-1.5" /> Message {currentProfile.displayName}
+                </Button>
+              </Link>
+            </div>
           </div>
         </Modal>
       )}

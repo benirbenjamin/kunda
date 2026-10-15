@@ -14,6 +14,29 @@ export default async function handler(req: any, res: any) {
   // Ensure settings are synced from DB
   await loadAdminSettingsFromDb();
 
+  // Public settings endpoint (safe business pricing without secrets)
+  if (req.method === 'GET' && req.query?.public === 'true') {
+    return res.status(200).json({
+      success: true,
+      settings: {
+        freeInitialMessages: Number(memoryStore.adminSettings.get('free_initial_messages') ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES),
+        freeDistinctRecipients: Number(memoryStore.adminSettings.get('free_distinct_recipients') ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS),
+        freeReplies: Number(memoryStore.adminSettings.get('free_replies') ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED),
+        hourlyPassPrice: Number(memoryStore.adminSettings.get('hourly_pass_cost') ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF),
+        threeDayPassPrice: Number(memoryStore.adminSettings.get('three_day_pass_cost') ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF),
+        weeklyPassPrice: Number(memoryStore.adminSettings.get('weekly_pass_cost') ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF),
+        payPerMessagePrice: Number(memoryStore.adminSettings.get('pay_per_message_cost') ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF),
+        contactUnlockPrice: Number(memoryStore.adminSettings.get('contact_unlock_cost') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF),
+        defaultCurrency: (memoryStore.adminSettings.get('default_currency') as string) || BUSINESS_CONFIG.DEFAULT_CURRENCY,
+      }
+    });
+  }
+
+  const auth = extractAuthUser(req);
+  if (!auth || !isAuthorizedRole(auth.role, ['super_admin', 'admin'])) {
+    return res.status(403).json({ success: false, error: 'Forbidden: Admin access required.' });
+  }
+
   // GET: Fetch all current settings
   if (req.method === 'GET') {
     const currentSettings = {
@@ -63,13 +86,21 @@ export default async function handler(req: any, res: any) {
 
     // 1. Business pricing and allowances
     if (updates.freeInitialMessages !== undefined) {
-      savePromises.push(saveAdminSettingToDb('free_initial_messages', parseInt(updates.freeInitialMessages, 10)));
+      const val = parseInt(updates.freeInitialMessages, 10);
+      savePromises.push(saveAdminSettingToDb('free_initial_messages', val));
+      for (const [, al] of memoryStore.allowances.entries()) {
+        al.initialRemaining = Math.max(0, val - (al.distinctRecipients?.length || 0));
+      }
     }
     if (updates.freeDistinctRecipients !== undefined) {
       savePromises.push(saveAdminSettingToDb('free_distinct_recipients', parseInt(updates.freeDistinctRecipients, 10)));
     }
     if (updates.freeReplies !== undefined) {
-      savePromises.push(saveAdminSettingToDb('free_replies', parseInt(updates.freeReplies, 10)));
+      const val = parseInt(updates.freeReplies, 10);
+      savePromises.push(saveAdminSettingToDb('free_replies', val));
+      for (const [, al] of memoryStore.allowances.entries()) {
+        al.repliesRemaining = val;
+      }
     }
     if (updates.hourlyPassPrice !== undefined) {
       savePromises.push(saveAdminSettingToDb('hourly_pass_cost', parseInt(updates.hourlyPassPrice, 10)));

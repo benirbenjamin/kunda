@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '../../components/ui/Button';
 import {
@@ -14,13 +15,50 @@ import {
   HelpCircle,
   Coffee,
   Compass,
+  Check,
 } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export const Home: React.FC = () => {
+  const { user, isAuthenticated } = useAuth();
   const { t } = useLanguage();
 
+  const [plans, setPlans] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any>({
+    freeInitialMessages: 3,
+    freeReplies: 3,
+    threeDayPassPrice: 1500,
+    weeklyPassPrice: 3000,
+    currency: 'RWF',
+  });
+
+  useEffect(() => {
+    api.get('/subscriptions/plans')
+      .then((res) => {
+        if (res.data?.success) {
+          if (Array.isArray(res.data.plans)) setPlans(res.data.plans);
+          if (res.data.settings) {
+            setSettings(res.data.settings);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const threeDayPlan = plans.find((p) => p.code === 'three_day') || {
+    price: settings.threeDayPassPrice ?? 1500,
+    currency: settings.currency ?? 'RWF',
+  };
+  const weeklyPlan = plans.find((p) => p.code === 'weekly') || {
+    price: settings.weeklyPassPrice ?? 3000,
+    currency: settings.currency ?? 'RWF',
+  };
+
+  const freeInitialMessages = settings.freeInitialMessages ?? 3;
+  const freeReplies = settings.freeReplies ?? 3;
+
   return (
-    <div className="space-y-24 pb-20">
+    <div className="space-y-24 pb-24 md:pb-20">
       {/* 1. HERO SECTION */}
       <section className="relative pt-12 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
         {/* Soft decorative background glow */}
@@ -28,35 +66,69 @@ export const Home: React.FC = () => {
         <div className="absolute top-1/3 right-10 w-[400px] h-[400px] bg-violet-200/30 rounded-full blur-3xl -z-10 pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
-          {/* Trust Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200/80 text-rose-700 text-xs sm:text-sm font-semibold shadow-sm animate-in fade-in slide-in-from-bottom-2">
-            <ShieldCheck className="w-4 h-4 text-rose-500" />
-            <span>{t('hero.badge')}</span>
-          </div>
+          {/* Trust Badge or Logged In Pill */}
+          {isAuthenticated ? (
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs sm:text-sm font-bold shadow-sm animate-in fade-in">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Logged in as <strong>{user?.email?.split('@')[0]}</strong></span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200/80 text-rose-700 text-xs sm:text-sm font-semibold shadow-sm animate-in fade-in slide-in-from-bottom-2">
+              <ShieldCheck className="w-4 h-4 text-rose-500" />
+              <span>{t('hero.badge')}</span>
+            </div>
+          )}
 
           {/* Headline */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-slate-900 tracking-tight max-w-4xl mx-auto leading-[1.15]">
-            {t('hero.title')}
+            {isAuthenticated ? (
+              <>Welcome back to your connection journey</>
+            ) : (
+              t('hero.title')
+            )}
           </h1>
 
           {/* Subtitle */}
           <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto font-normal leading-relaxed">
-            {t('hero.subtitle')}
+            {isAuthenticated ? (
+              <>Discover singles matching your preferences, manage your conversations, and connect respectfully with verified members across Rwanda and beyond.</>
+            ) : (
+              t('hero.subtitle')
+            )}
           </p>
 
-          {/* Call to Actions */}
+          {/* Call to Actions (Dynamic depending on session) */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link to="/auth/register" className="w-full sm:w-auto">
-              <Button size="lg" className="w-full sm:w-auto px-8 text-base font-bold shadow-lg shadow-rose-200">
-                {t('hero.cta')}
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
-            <Link to="/how-it-works" className="w-full sm:w-auto">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto font-semibold">
-                {t('hero.learnMore')}
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <Link to="/dashboard/discover" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto px-8 text-base font-bold shadow-lg shadow-rose-200">
+                    <Compass className="w-5 h-5 mr-2" />
+                    Explore Discover Feed
+                  </Button>
+                </Link>
+                <Link to="/dashboard/messages" className="w-full sm:w-auto">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto font-semibold">
+                    <MessageCircle className="w-5 h-5 mr-2 text-rose-500" />
+                    Open Messages
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/auth/register" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto px-8 text-base font-bold shadow-lg shadow-rose-200">
+                    {t('hero.cta')}
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </Link>
+                <Link to="/how-it-works" className="w-full sm:w-auto">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto font-semibold">
+                    {t('hero.learnMore')}
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Community Trust Indicators */}
@@ -168,7 +240,7 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* 5. PRICING OVERVIEW */}
+      {/* 5. DYNAMIC PRICING OVERVIEW (Reflects live Admin Dashboard settings) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-14 space-y-3">
           <span className="text-xs font-bold text-rose-600 uppercase tracking-widest">Affordable & Honest</span>
@@ -182,66 +254,155 @@ export const Home: React.FC = () => {
             <div className="space-y-3">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Free Starter</span>
               <div className="text-4xl font-extrabold text-slate-900">0 RWF</div>
-              <p className="text-sm text-slate-600">{t('plans.freeDesc')}</p>
+              <p className="text-sm text-slate-600">
+                {freeInitialMessages} free initial messages and {freeReplies} free replies to start your journey.
+              </p>
+              <div className="pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Full profile discovery
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> {freeInitialMessages} free outgoing conversations
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> {freeReplies} free conversation replies
+                </div>
+              </div>
             </div>
-            <Link to="/auth/register">
-              <Button variant="outline" className="w-full">
-                Get Started Free
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <Link to="/dashboard/messages">
+                <Button variant="outline" className="w-full">
+                  Go to Messages
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth/register">
+                <Button variant="outline" className="w-full">
+                  Get Started Free
+                </Button>
+              </Link>
+            )}
           </div>
 
-          {/* 3-Day Plan */}
+          {/* 3-Day Plan (Dynamic Price) */}
           <div className="bg-white rounded-3xl p-8 border-2 border-rose-500 shadow-xl relative space-y-6 flex flex-col justify-between">
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-rose-600 text-white text-[11px] font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm">
               Most Popular Pass
             </div>
             <div className="space-y-3">
               <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">3-Day Connection Pass</span>
-              <div className="text-4xl font-extrabold text-slate-900">1,500 RWF</div>
-              <p className="text-sm text-slate-600">{t('plans.threeDayDesc')}</p>
+              <div className="text-4xl font-extrabold text-slate-900">
+                {threeDayPlan.price.toLocaleString()} {threeDayPlan.currency}
+              </div>
+              <p className="text-sm text-slate-600">
+                Unlimited messaging for 72 hours. Perfect for weekend romance.
+              </p>
+              <div className="pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Unlimited messages for 72 hours
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Direct conversation initiations
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Priority recommendation status
+                </div>
+              </div>
             </div>
-            <Link to="/auth/register">
-              <Button variant="primary" className="w-full shadow-md shadow-rose-200">
-                Join & Unlock Pass
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <Link to="/dashboard/subscription">
+                <Button variant="primary" className="w-full shadow-md shadow-rose-200">
+                  Select 3-Day Pass
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth/register">
+                <Button variant="primary" className="w-full shadow-md shadow-rose-200">
+                  Join & Unlock Pass
+                </Button>
+              </Link>
+            )}
           </div>
 
-          {/* Weekly Plan */}
+          {/* Weekly Plan (Dynamic Price) */}
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6 flex flex-col justify-between">
             <div className="space-y-3">
               <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Weekly Premium</span>
-              <div className="text-4xl font-extrabold text-slate-900">3,000 RWF</div>
-              <p className="text-sm text-slate-600">{t('plans.weeklyDesc')}</p>
+              <div className="text-4xl font-extrabold text-slate-900">
+                {weeklyPlan.price.toLocaleString()} {weeklyPlan.currency}
+              </div>
+              <p className="text-sm text-slate-600">
+                Full 7-day unlimited access with top placement in recommendations.
+              </p>
+              <div className="pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Full 7 days unlimited messaging
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Top placement in Discover feed
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Dedicated support assistance
+                </div>
+              </div>
             </div>
-            <Link to="/auth/register">
-              <Button variant="outline" className="w-full">
-                Get Weekly Premium
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <Link to="/dashboard/subscription">
+                <Button variant="outline" className="w-full">
+                  Select Weekly Premium
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth/register">
+                <Button variant="outline" className="w-full">
+                  Get Weekly Premium
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>
 
-      {/* 6. CALL TO ACTION BANNER */}
+      {/* 6. CALL TO ACTION BANNER (With visible, styled white button & logged in check) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-r from-rose-600 via-rose-500 to-violet-600 rounded-3xl p-10 sm:p-16 text-center text-white space-y-6 shadow-float">
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight max-w-2xl mx-auto leading-tight">
-            Ready to Meet Someone Special Who Shares Your Values?
+            {isAuthenticated ? (
+              <>Ready to discover someone special today?</>
+            ) : (
+              <>Ready to Meet Someone Special Who Shares Your Values?</>
+            )}
           </h2>
           <p className="text-rose-100 max-w-xl mx-auto text-base sm:text-lg">
-            Join Kunda Space today for free. Experience respectful, verified dating designed for adults 18+.
+            {isAuthenticated ? (
+              <>Browse genuine verified singles right now in your Discover recommendations.</>
+            ) : (
+              <>Join Kunda Space today for free. Experience respectful, verified dating designed for adults 18+.</>
+            )}
           </p>
           <div className="pt-2">
-            <Link to="/auth/register">
-              <Button
-                size="lg"
-                className="bg-white hover:bg-slate-50 text-rose-600 font-extrabold px-10 shadow-xl"
-              >
-                Join Kunda Space Now (18+)
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <Link to="/dashboard/discover">
+                <Button
+                  variant="white"
+                  size="lg"
+                  className="bg-white hover:bg-rose-50 text-rose-600 font-extrabold px-10 shadow-xl border-none"
+                >
+                  <Compass className="w-5 h-5 mr-2 text-rose-600" />
+                  Continue Discovering Matches
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth/register">
+                <Button
+                  variant="white"
+                  size="lg"
+                  className="bg-white hover:bg-rose-50 text-rose-600 font-extrabold px-10 shadow-xl border-none"
+                >
+                  Join Kunda Space Now (18+)
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>

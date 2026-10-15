@@ -8,12 +8,14 @@ import { api } from '../../lib/api';
 export const MembershipPlans: React.FC = () => {
   const { t } = useLanguage();
   const [plans, setPlans] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any>({ freeInitialMessages: 3, freeReplies: 3 });
 
   useEffect(() => {
     api.get('/subscriptions/plans')
       .then((res) => {
-        if (res.data.success && res.data.plans) {
-          setPlans(res.data.plans);
+        if (res.data?.success) {
+          if (Array.isArray(res.data.plans)) setPlans(res.data.plans);
+          if (res.data.settings) setSettings(res.data.settings);
         }
       })
       .catch(() => {});
@@ -24,6 +26,9 @@ export const MembershipPlans: React.FC = () => {
   const weeklyPlan = plans.find((p) => p.code === 'weekly') || { price: 3000, currency: 'RWF' };
   const payPerMsgPlan = plans.find((p) => p.code === 'pay_per_message') || { price: 150, currency: 'RWF' };
   const contactUnlockPlan = plans.find((p) => p.code === 'contact_unlock') || { price: 2000, currency: 'RWF' };
+
+  const freeInitialMessages = settings.freeInitialMessages ?? 3;
+  const freeReplies = settings.freeReplies ?? 3;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-16">
@@ -45,16 +50,18 @@ export const MembershipPlans: React.FC = () => {
           <div className="space-y-4">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Free Starter</span>
             <div className="text-3xl font-black text-slate-900">0 RWF</div>
-            <p className="text-xs text-slate-600">{t('plans.freeDesc')}</p>
+            <p className="text-xs text-slate-600">
+              {freeInitialMessages} free initial messages and {freeReplies} free replies to start your journey.
+            </p>
             <div className="pt-4 border-t border-slate-100 space-y-2.5">
               <div className="flex items-center gap-2 text-xs text-slate-700">
                 <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Full Profile Discovery
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-700">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" /> 3 Free Initial Outgoing Messages
+                <Check className="w-4 h-4 text-emerald-500 shrink-0" /> {freeInitialMessages} Free Initial Outgoing Messages
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-700">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" /> 3 Free Conversation Replies
+                <Check className="w-4 h-4 text-emerald-500 shrink-0" /> {freeReplies} Free Conversation Replies
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-700">
                 <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Compatibility Score Breakdown

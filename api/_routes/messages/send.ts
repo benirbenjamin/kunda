@@ -40,11 +40,19 @@ export default async function handler(req: any, res: any) {
     }
 
     // Current allowance & wallet status
-    const allowances = memoryStore.allowances.get(auth.userId) || {
-      initialRemaining: 3,
-      distinctRecipients: [],
-      repliesRemaining: 3,
-    };
+    const freeInitLimit = Number(memoryStore.adminSettings.get('free_initial_messages') ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+    const freeDistinctLimit = Number(memoryStore.adminSettings.get('free_distinct_recipients') ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+    const freeRepliesLimit = Number(memoryStore.adminSettings.get('free_replies') ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+
+    let allowances = memoryStore.allowances.get(auth.userId);
+    if (!allowances) {
+      allowances = {
+        initialRemaining: freeInitLimit,
+        distinctRecipients: [],
+        repliesRemaining: freeRepliesLimit,
+      };
+      memoryStore.allowances.set(auth.userId, allowances);
+    }
     const wallet = await getWalletBalance(auth.userId);
 
     // Active subscription check

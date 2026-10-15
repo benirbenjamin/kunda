@@ -1,14 +1,40 @@
 // =====================================================================
-// GET /api/messages/conversations - List member conversations
+// GET /api/messages/conversations - List member conversations & allowance
 // =====================================================================
 import { extractAuthUser } from '../../_lib/auth.js';
-import { memoryStore } from '../../_lib/db.js';
+import { memoryStore, loadAdminSettingsFromDb } from '../../_lib/db.js';
+import { BUSINESS_CONFIG } from '../../_lib/config.js';
 
 export default async function handler(req: any, res: any) {
   const auth = extractAuthUser(req);
   if (!auth) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
+
+  // Ensure latest dynamic settings from DB are loaded
+  await loadAdminSettingsFromDb();
+
+  const freeInitLimit = Number(memoryStore.adminSettings.get('free_initial_messages') ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+  const freeDistinctLimit = Number(memoryStore.adminSettings.get('free_distinct_recipients') ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+  const freeRepliesLimit = Number(memoryStore.adminSettings.get('free_replies') ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+  const contactUnlockPrice = Number(memoryStore.adminSettings.get('contact_unlock_cost') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
+  const payPerMessagePrice = Number(memoryStore.adminSettings.get('pay_per_message_cost') ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF);
+
+  // Initialize or get allowances for this user
+  let userAllowances = memoryStore.allowances.get(auth.userId);
+  if (!userAllowances) {
+    userAllowances = {
+      initialRemaining: freeInitLimit,
+      distinctRecipients: [],
+      repliesRemaining: freeRepliesLimit,
+    };
+    memoryStore.allowances.set(auth.userId, userAllowances);
+  }
+
+  // Active subscription check
+  const activeSub = memoryStore.subscriptions.find(
+    (s) => s.userId === auth.userId && s.status === 'active' && new Date(s.expiresAt) > new Date()
+  );
 
   // Find all messages involving the user
   const userMessages = memoryStore.messages.filter(
@@ -71,5 +97,18 @@ export default async function handler(req: any, res: any) {
   // Sort by last activity descending
   conversationList.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
 
-  return res.status(200).json({ success: true, conversations: conversationList });
+  return res.status(200).json({
+    success: true,
+    conversations: conversationList,
+    allowances: userAllowances,
+    hasActiveSubscription: Boolean(activeSub),
+    contactUnlockPrice,
+    settings: {
+      freeInitialMessages: freeInitLimit,
+      freeReplies: freeRepliesLimit,
+      freeDistinctRecipients: freeDistinctLimit,
+      contactUnlockPrice,
+      payPerMessagePrice,
+    }
+  });
 }

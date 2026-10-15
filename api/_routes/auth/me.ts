@@ -19,12 +19,21 @@ export default async function handler(req: any, res: any) {
   const profile = memoryStore.profiles.find((p) => p.userId === auth.userId);
   const wallet = await getWalletBalance(auth.userId);
 
+  await loadAdminSettingsFromDb();
+  const freeInitLimit = Number(memoryStore.adminSettings.get('free_initial_messages') ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+  const freeDistinctLimit = Number(memoryStore.adminSettings.get('free_distinct_recipients') ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+  const freeRepliesLimit = Number(memoryStore.adminSettings.get('free_replies') ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+
   // Remaining free allowances
-  const allowances = memoryStore.allowances.get(auth.userId) || {
-    initialRemaining: 3,
-    distinctRecipients: [],
-    repliesRemaining: 3,
-  };
+  let allowances = memoryStore.allowances.get(auth.userId);
+  if (!allowances) {
+    allowances = {
+      initialRemaining: freeInitLimit,
+      distinctRecipients: [],
+      repliesRemaining: freeRepliesLimit,
+    };
+    memoryStore.allowances.set(auth.userId, allowances);
+  }
 
   // Active subscription check
   const activeSub = memoryStore.subscriptions.find(

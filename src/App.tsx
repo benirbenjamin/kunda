@@ -6,6 +6,7 @@ import { WalletProvider } from './contexts/WalletContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
+import { BottomNav } from './components/layout/BottomNav';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 // Public Pages
@@ -189,6 +190,7 @@ export const AppContent: React.FC = () => {
         </ErrorBoundary>
       </main>
       <Footer />
+      <BottomNav />
     </div>
   );
 };

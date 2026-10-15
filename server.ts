@@ -109,6 +109,11 @@ bindRoute('/api/admin/users', adminUsersHandler);
 bindRoute('/api/admin/settings', adminSettingsHandler);
 bindRoute('/api/admin/moderation', adminModerationHandler);
 bindRoute('/api/admin/ledger', adminLedgerHandler);
+bindRoute('/api/settings/public', (req: any, res: any) => {
+  req.query = req.query || {};
+  req.query.public = 'true';
+  return adminSettingsHandler(req, res);
+});
 bindRoute('/api/admin/backup', adminBackupHandler);
 
 // Health check

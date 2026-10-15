@@ -1,5 +1,5 @@
 // =====================================================================
-// GET /api/subscriptions/plans - Subscription and Pricing Plans
+// GET /api/subscriptions/plans - Dynamic Subscription and Pricing Plans
 // =====================================================================
 import { memoryStore, loadAdminSettingsFromDb } from '../../_lib/db.js';
 import { BUSINESS_CONFIG } from '../../_lib/config.js';
@@ -15,22 +15,28 @@ export default async function handler(req: any, res: any) {
   const contactUnlockPrice = Number(memoryStore.adminSettings.get('contact_unlock_cost') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
   const currency = (memoryStore.adminSettings.get('default_currency') as string) || BUSINESS_CONFIG.DEFAULT_CURRENCY;
 
+  const freeInitialMessages = Number(memoryStore.adminSettings.get('free_initial_messages') ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+  const freeReplies = Number(memoryStore.adminSettings.get('free_replies') ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+  const freeDistinctRecipients = Number(memoryStore.adminSettings.get('free_distinct_recipients') ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+
   const plans = [
     {
       code: 'free',
       name_en: 'Free Starter',
       name_rw: 'Ibanze ku Buntu',
       name_fr: 'Débutant Gratuit',
-      description_en: 'Explore verified members, 3 free messages to new people and 3 free replies.',
-      description_rw: "Reba abanyamuryango, ubutumwa 3 ku buntu ku bantu bashya n'ibisubizo 3.",
-      description_fr: "Explorez les profils vérifiés, 3 messages gratuits et 3 réponses gratuites.",
+      description_en: `Explore verified members, ${freeInitialMessages} free messages to new people and ${freeReplies} free replies.`,
+      description_rw: `Reba abanyamuryango, ubutumwa ${freeInitialMessages} ku buntu ku bantu bashya n'ibisubizo ${freeReplies}.`,
+      description_fr: `Explorez les profils vérifiés, ${freeInitialMessages} messages gratuits et ${freeReplies} réponses gratuites.`,
       price: 0,
       currency,
       durationDays: 0,
+      freeInitialMessages,
+      freeReplies,
       features: [
         'Complete Profile Setup',
-        '3 Free Outgoing Messages',
-        '3 Free Conversation Replies',
+        `${freeInitialMessages} Free Outgoing Messages`,
+        `${freeReplies} Free Conversation Replies`,
         'Algorithmic Compatibility Breakdown'
       ]
     },
@@ -39,9 +45,9 @@ export default async function handler(req: any, res: any) {
       name_en: 'Hourly Pass (24 Hours)',
       name_rw: "Pass y'Amasaha 24",
       name_fr: 'Pass Connexion 24 Heures',
-      description_en: `Unlimited messaging for 24 hours. Quick connection boost for ${hourlyPrice} ${currency}.`,
-      description_rw: `Ubutumwa budafite umupaka mu masaha 24 kuri ${hourlyPrice} ${currency}.`,
-      description_fr: `Messagerie illimitée pendant 24 heures pour ${hourlyPrice} ${currency}.`,
+      description_en: `Unlimited messaging for 24 hours. Quick connection boost for ${hourlyPrice.toLocaleString()} ${currency}.`,
+      description_rw: `Ubutumwa budafite umupaka mu masaha 24 kuri ${hourlyPrice.toLocaleString()} ${currency}.`,
+      description_fr: `Messagerie illimitée pendant 24 heures pour ${hourlyPrice.toLocaleString()} ${currency}.`,
       price: hourlyPrice,
       currency,
       durationDays: 1,
@@ -57,9 +63,9 @@ export default async function handler(req: any, res: any) {
       name_en: '3-Day Connection Pass',
       name_rw: "Icyumweru Gitoya (Iminsi 3)",
       name_fr: 'Pass Connexion 3 Jours',
-      description_en: `Unlimited messaging for 72 hours. Perfect for weekend romance (${threeDayPrice} ${currency}).`,
-      description_rw: `Ubutumwa budafite umupaka mu masaha 72 kuri ${threeDayPrice} ${currency}. Byiza ku mpera z'icyumweru.`,
-      description_fr: `Messagerie illimitée pendant 72 heures (${threeDayPrice} ${currency}). Idéal pour le week-end.`,
+      description_en: `Unlimited messaging for 72 hours. Perfect for weekend romance (${threeDayPrice.toLocaleString()} ${currency}).`,
+      description_rw: `Ubutumwa budafite umupaka mu masaha 72 kuri ${threeDayPrice.toLocaleString()} ${currency}. Byiza ku mpera z'icyumweru.`,
+      description_fr: `Messagerie illimitée pendant 72 heures (${threeDayPrice.toLocaleString()} ${currency}). Idéal pour le week-end.`,
       price: threeDayPrice,
       currency,
       durationDays: 3,
@@ -76,9 +82,9 @@ export default async function handler(req: any, res: any) {
       name_en: 'Weekly Premium',
       name_rw: 'Icyumweru Cyose',
       name_fr: 'Pass Hebdomadaire Premium',
-      description_en: `Full access for 7 days with priority discovery and unlimited messaging (${weeklyPrice} ${currency}).`,
-      description_rw: `Kuganira bidahagarara icyumweru cyose no kugaragara mbere kuri ${weeklyPrice} ${currency}.`,
-      description_fr: `Accès illimité pendant 7 jours avec visibilité prioritaire (${weeklyPrice} ${currency}).`,
+      description_en: `Full access for 7 days with priority discovery and unlimited messaging (${weeklyPrice.toLocaleString()} ${currency}).`,
+      description_rw: `Kuganira bidahagarara icyumweru cyose no kugaragara mbere kuri ${weeklyPrice.toLocaleString()} ${currency}.`,
+      description_fr: `Accès illimité pendant 7 jours avec visibilité prioritaire (${weeklyPrice.toLocaleString()} ${currency}).`,
       price: weeklyPrice,
       currency,
       durationDays: 7,
@@ -94,9 +100,9 @@ export default async function handler(req: any, res: any) {
       name_en: 'Pay-Per-Message',
       name_rw: 'Kwishyura Buri Butumwa',
       name_fr: 'Paiement Par Message',
-      description_en: `Pay ${payPerMessagePrice} ${currency} only when you send an individual message after free allowance.`,
-      description_rw: `Ishyura ${payPerMessagePrice} ${currency} gusa ku butumwa wohereje iyo ubufasha burangiye.`,
-      description_fr: `Payez ${payPerMessagePrice} ${currency} par message envoyé hors quota gratuit.`,
+      description_en: `Pay ${payPerMessagePrice.toLocaleString()} ${currency} only when you send an individual message after free allowance.`,
+      description_rw: `Ishyura ${payPerMessagePrice.toLocaleString()} ${currency} gusa ku butumwa wohereje iyo ubufasha burangiye.`,
+      description_fr: `Payez ${payPerMessagePrice.toLocaleString()} ${currency} par message envoyé hors quota gratuit.`,
       price: payPerMessagePrice,
       currency,
       durationDays: 0,
@@ -111,9 +117,9 @@ export default async function handler(req: any, res: any) {
       name_en: 'Direct Contact Unlock',
       name_rw: 'Kureba Nimero ya Telefone',
       name_fr: 'Déblocage Contact Direct',
-      description_en: `Unlock direct phone number when the member gives mutual consent (${contactUnlockPrice} ${currency}).`,
-      description_rw: `Reba numero ya telefone mugihe mwembi mwabyemeranyijweho (${contactUnlockPrice} ${currency}).`,
-      description_fr: `Débloquez le numéro de téléphone avec consentement mutuel (${contactUnlockPrice} ${currency}).`,
+      description_en: `Unlock direct phone number when the member gives mutual consent (${contactUnlockPrice.toLocaleString()} ${currency}).`,
+      description_rw: `Reba numero ya telefone mugihe mwembi mwabyemeranyijweho (${contactUnlockPrice.toLocaleString()} ${currency}).`,
+      description_fr: `Débloquez le numéro de téléphone avec consentement mutuel (${contactUnlockPrice.toLocaleString()} ${currency}).`,
       price: contactUnlockPrice,
       currency,
       durationDays: 0,
@@ -125,5 +131,19 @@ export default async function handler(req: any, res: any) {
     }
   ];
 
-  return res.status(200).json({ success: true, plans });
+  return res.status(200).json({
+    success: true,
+    plans,
+    settings: {
+      freeInitialMessages,
+      freeReplies,
+      freeDistinctRecipients,
+      hourlyPassPrice: hourlyPrice,
+      threeDayPassPrice: threeDayPrice,
+      weeklyPassPrice: weeklyPrice,
+      payPerMessagePrice,
+      contactUnlockPrice,
+      currency
+    }
+  });
 }

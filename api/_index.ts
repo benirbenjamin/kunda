@@ -28,6 +28,7 @@ import adminUsersHandler from './_routes/admin/users.js';
 import adminSettingsHandler from './_routes/admin/settings.js';
 import adminModerationHandler from './_routes/admin/moderation.js';
 import adminLedgerHandler from './_routes/admin/ledger.js';
+import adminBackupHandler from './_routes/admin/backup.js';
 
 const routes: Record<string, (req: any, res: any) => Promise<any> | any> = {
   'auth/login': loginHandler,
@@ -52,11 +53,17 @@ const routes: Record<string, (req: any, res: any) => Promise<any> | any> = {
   'subscriptions/plans': plansHandler,
   'subscriptions/subscribe': subscribeHandler,
   'notifications': notificationsHandler,
+  'settings/public': (req: any, res: any) => {
+    req.query = req.query || {};
+    req.query.public = 'true';
+    return adminSettingsHandler(req, res);
+  },
   'admin/metrics': adminMetricsHandler,
   'admin/users': adminUsersHandler,
   'admin/settings': adminSettingsHandler,
   'admin/moderation': adminModerationHandler,
   'admin/ledger': adminLedgerHandler,
+  'admin/backup': adminBackupHandler,
 };
 
 export default async function handler(req: any, res: any) {
