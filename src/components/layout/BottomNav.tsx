@@ -11,6 +11,7 @@ import {
   Shield,
   Home,
   CheckCircle,
+  Flame,
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
@@ -40,6 +41,19 @@ export const BottomNav: React.FC = () => {
             >
               <Compass className={`w-5 h-5 ${isActive('/dashboard/discover') ? 'stroke-[2.5]' : ''}`} />
               <span className="text-[10px] mt-0.5 tracking-tight">Discover</span>
+            </Link>
+
+            {/* Feed / Community Posts */}
+            <Link
+              to="/dashboard/feed"
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all ${
+                isActive('/dashboard/feed')
+                  ? 'text-rose-600 font-bold scale-105'
+                  : 'text-slate-400 hover:text-slate-600 font-medium'
+              }`}
+            >
+              <Flame className={`w-5 h-5 ${isActive('/dashboard/feed') ? 'fill-rose-500 text-rose-600' : ''}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight">Feed</span>
             </Link>
 
             {/* Matches */}

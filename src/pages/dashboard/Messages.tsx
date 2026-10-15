@@ -27,8 +27,11 @@ import {
   MoreVertical,
   User,
   Info,
+  Plus,
 } from 'lucide-react';
 import { api, getErrorMessage } from '../../lib/api';
+import { CreateStoryModal } from '../../components/stories/CreateStoryModal';
+import { StoryViewerModal, UserStoryGroup } from '../../components/stories/StoryViewerModal';
 
 const QUICK_EMOJIS = ['❤️', '🔥', '😂', '😍', '👋', '✨', '🌹', '👍'];
 
@@ -76,10 +79,27 @@ export const Messages: React.FC = () => {
   const [unlockedPhone, setUnlockedPhone] = useState<string | null>(null);
   const [contactUnlockPrice, setContactUnlockPrice] = useState<number>(2000);
 
+  // 24h Stories state
+  const [storyGroups, setStoryGroups] = useState<UserStoryGroup[]>([]);
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState<boolean>(false);
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+
+  const fetchStories = async () => {
+    try {
+      const res = await api.get('/stories');
+      if (res.data?.success && Array.isArray(res.data.storiesGrouped)) {
+        setStoryGroups(res.data.storiesGrouped);
+      }
+    } catch (e) {
+      console.warn('Stories fetch error:', e);
+    }
+  };
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // 1. Fetch dynamic settings & plans on mount to guarantee dynamic prices & quotas
   useEffect(() => {
+    fetchStories();
     api.get('/subscriptions/plans')
       .then((res) => {
         if (res.data?.success) {
@@ -363,10 +383,56 @@ export const Messages: React.FC = () => {
               </Link>
             </div>
 
-            {/* Instagram Stories / Active Now Circles Bar */}
-            {conversations.length > 0 && (
-              <div className="flex gap-3 overflow-x-auto pb-1 pt-1 scrollbar-none">
-                {conversations.map((c) => (
+            {/* Instagram Stories / Active Now Circles Bar with Add Story button */}
+            <div className="flex gap-2.5 overflow-x-auto pb-1 pt-1 scrollbar-none items-center">
+              {/* Add Story Button */}
+              <button
+                type="button"
+                onClick={() => setIsCreateStoryOpen(true)}
+                className="flex flex-col items-center gap-1 shrink-0 group focus:outline-none"
+              >
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full p-0.5 border-2 border-dashed border-rose-400 group-hover:border-rose-600 flex items-center justify-center bg-rose-50 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-sm">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 max-w-[52px] truncate">
+                  + Story
+                </span>
+              </button>
+
+              {/* Active Stories from members */}
+              {storyGroups.map((group, idx) => (
+                <button
+                  key={'story-group-' + group.userId}
+                  onClick={() => setActiveStoryIndex(idx)}
+                  className="flex flex-col items-center gap-1 shrink-0 group focus:outline-none"
+                >
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-600 group-hover:scale-105 transition-transform">
+                      <img
+                        src={group.avatar}
+                        alt={group.displayName}
+                        className="w-full h-full rounded-full object-cover border-2 border-white"
+                      />
+                    </div>
+                    {group.stories.length > 1 && (
+                      <span className="w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[8px] font-bold flex items-center justify-center border border-white absolute -bottom-0.5 -right-0.5">
+                        {group.stories.length}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-700 max-w-[52px] truncate">
+                    {group.displayName?.split(' ')[0]}
+                  </span>
+                </button>
+              ))}
+
+              {/* Active conversation fallbacks if no stories */}
+              {storyGroups.length === 0 &&
+                conversations.map((c) => (
                   <button
                     key={'story-' + c.partnerId}
                     onClick={() => setSelectedPartnerId(c.partnerId)}
@@ -387,8 +453,7 @@ export const Messages: React.FC = () => {
                     </span>
                   </button>
                 ))}
-              </div>
-            )}
+            </div>
 
             {/* Search Input */}
             <div className="relative">
@@ -650,9 +715,13 @@ export const Messages: React.FC = () => {
                           {isMine && (
                             <span>
                               {m.isRead ? (
-                                <CheckCheck className="w-3 h-3 text-rose-500" title="Seen" />
+                                <span title="Seen">
+                                  <CheckCheck className="w-3 h-3 text-rose-500" />
+                                </span>
                               ) : (
-                                <Check className="w-3 h-3 text-slate-400" title="Delivered" />
+                                <span title="Delivered">
+                                  <Check className="w-3 h-3 text-slate-400" />
+                                </span>
                               )}
                             </span>
                           )}
@@ -774,6 +843,27 @@ export const Messages: React.FC = () => {
           </Button>
         </div>
       </Modal>
+
+      {/* 24h Story Creation & Viewer Modals */}
+      <CreateStoryModal
+        isOpen={isCreateStoryOpen}
+        onClose={() => setIsCreateStoryOpen(false)}
+        onStoryCreated={() => {
+          fetchStories();
+        }}
+      />
+
+      {activeStoryIndex !== null && (
+        <StoryViewerModal
+          isOpen={true}
+          userGroups={storyGroups}
+          initialUserIndex={activeStoryIndex}
+          onClose={() => setActiveStoryIndex(null)}
+          onStoryDeleted={() => {
+            fetchStories();
+          }}
+        />
+      )}
     </div>
   );
 };

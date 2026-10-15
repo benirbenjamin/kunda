@@ -19,6 +19,7 @@ import {
   Bell,
   Volume2,
   VolumeX,
+  Flame,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -114,6 +115,17 @@ export const Navbar: React.FC = () => {
                 >
                   <Compass className="w-4 h-4" />
                   {t('nav.discover')}
+                </Link>
+                <Link
+                  to="/dashboard/feed"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    isActive('/dashboard/feed')
+                      ? 'text-rose-600 bg-rose-50'
+                      : 'text-slate-600 hover:text-rose-600'
+                  }`}
+                >
+                  <Flame className="w-4 h-4 text-rose-500" />
+                  Feed
                 </Link>
                 <Link
                   to="/dashboard/matches"
@@ -311,6 +323,13 @@ export const Navbar: React.FC = () => {
                 className="py-2 px-3 text-sm font-medium text-slate-700 hover:bg-rose-50 rounded-lg flex items-center gap-2"
               >
                 <Compass className="w-4 h-4 text-rose-500" /> {t('nav.discover')}
+              </Link>
+              <Link
+                to="/dashboard/feed"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2 px-3 text-sm font-medium text-slate-700 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+              >
+                <Flame className="w-4 h-4 text-rose-500" /> Feed
               </Link>
               <Link
                 to="/dashboard/matches"

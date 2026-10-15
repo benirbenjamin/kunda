@@ -1,166 +1,22 @@
-// api/_routes/auth/register.ts
-import crypto from "crypto";
-
-// api/_lib/auth.ts
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-
-// api/_lib/config.ts
-var BUSINESS_CONFIG = {
-  // Free messaging limits
-  FREE_INITIAL_MESSAGES: 3,
-  FREE_DISTINCT_RECIPIENTS: 3,
-  FREE_REPLIES_ALLOWED: 3,
-  // Costs (in minor units: 1 RWF = 1 unit or cents)
-  HOURLY_PASS_PRICE_RWF: 500,
-  THREE_DAY_PASS_PRICE_RWF: 1500,
-  WEEKLY_PASS_PRICE_RWF: 3e3,
-  PAY_PER_MESSAGE_PRICE_RWF: 150,
-  CONTACT_UNLOCK_PRICE_RWF: 2e3,
-  DEFAULT_CURRENCY: "RWF",
-  // Algorithm weights (0-100)
-  MATCHING_WEIGHTS: {
-    INTENTION: 0.25,
-    AGE: 0.2,
-    LOCATION: 0.15,
-    INTERESTS: 0.15,
-    LANGUAGE: 0.1,
-    LIFESTYLE: 0.1,
-    OTHER: 0.05
-  },
-  // Minimum required age by law
-  MINIMUM_AGE_YEARS: 18
-};
-
-// api/_lib/auth.ts
-var JWT_SECRET = process.env.JWT_SECRET || "kunda-space-super-secure-production-jwt-token-2026";
-var JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
-function calculateAge(dobString) {
-  if (!dobString) return 0;
-  const dob = new Date(dobString);
-  if (isNaN(dob.getTime())) return 0;
-  const today = /* @__PURE__ */ new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  const m = today.getMonth() - dob.getMonth();
-  if (m < 0 || m === 0 && today.getDate() < dob.getDate()) {
-    age--;
-  }
-  return age;
-}
-function isAdult(dobString) {
-  return calculateAge(dobString) >= BUSINESS_CONFIG.MINIMUM_AGE_YEARS;
-}
-async function hashPassword(plainText) {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(plainText, salt);
-}
-async function comparePassword(plainText, hash) {
-  return bcrypt.compare(plainText, hash);
-}
-function generateToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-}
-function verifyToken(token) {
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
   try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (err) {
-    return null;
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
   }
-}
-function extractAuthUser(req) {
-  const authHeader = req.headers?.authorization || req.headers?.Authorization;
-  if (!authHeader || typeof authHeader !== "string") return null;
-  const parts = authHeader.split(" ");
-  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") return null;
-  return verifyToken(parts[1]);
-}
-function isAuthorizedRole(userRole, requiredRoles) {
-  return requiredRoles.includes(userRole);
-}
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
 // api/_lib/db.ts
 import pg from "pg";
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
-dotenv.config();
-var { Pool: PgPool } = pg;
-var dbUrl = (process.env.DATABASE_URL || "").trim();
-var isPostgres = dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://");
-var isMysql = dbUrl.startsWith("mysql://") || Boolean(process.env.MYSQL_DATABASE || process.env.DB_NAME || process.env.MYSQL_HOST || process.env.DB_HOST);
-var pgPool = null;
-var mysqlPool = null;
-if (isPostgres) {
-  try {
-    pgPool = new PgPool({
-      connectionString: dbUrl,
-      ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
-      max: 10,
-      idleTimeoutMillis: 3e4,
-      connectionTimeoutMillis: 5e3
-    });
-    pgPool.on("error", (err) => {
-      console.warn("PostgreSQL idle client error, keeping pool alive:", err);
-    });
-    console.log("\u{1F4E6} PostgreSQL connection pool initialized.");
-  } catch (pgErr) {
-    console.warn("\u26A0\uFE0F Could not initialize PostgreSQL pool, falling back to memory store:", pgErr);
-    pgPool = null;
-  }
-} else if (isMysql) {
-  try {
-    if (dbUrl) {
-      mysqlPool = mysql.createPool({
-        uri: dbUrl,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 1e4,
-        multipleStatements: true
-      });
-    } else {
-      mysqlPool = mysql.createPool({
-        host: process.env.MYSQL_HOST || process.env.DB_HOST || "127.0.0.1",
-        port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || "3306", 10),
-        user: process.env.MYSQL_USER || process.env.DB_USER || "root",
-        password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || "",
-        database: process.env.MYSQL_DATABASE || process.env.DB_NAME || "kunda_space",
-        ssl: process.env.MYSQL_SSL === "true" || process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : void 0,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 1e4,
-        multipleStatements: true
-      });
-    }
-    console.log("\u{1F4E6} MySQL connection pool initialized.");
-  } catch (poolErr) {
-    console.warn("\u26A0\uFE0F Could not initialize MySQL pool, falling back to memory store:", poolErr);
-    mysqlPool = null;
-  }
-}
-var memoryStore = {
-  users: [],
-  profiles: [],
-  photos: [],
-  preferences: [],
-  likes: [],
-  passes: [],
-  matches: [],
-  conversations: [],
-  messages: [],
-  allowances: /* @__PURE__ */ new Map(),
-  wallets: /* @__PURE__ */ new Map(),
-  transactions: [],
-  subscriptions: [],
-  contactUnlocks: [],
-  notifications: [],
-  moderationEvents: [],
-  reports: [],
-  adminSettings: /* @__PURE__ */ new Map(),
-  tutorials: []
-};
 function initMemoryStore() {
   const adminId = "a0000000-0000-0000-0000-000000000001";
   memoryStore.users.push({
@@ -452,8 +308,95 @@ function initMemoryStore() {
     memoryStore.wallets.set(m.id, { balanceMinor: 5e3, currency: "RWF" });
     memoryStore.allowances.set(m.id, { initialRemaining: 3, distinctRecipients: [], repliesRemaining: 3 });
   }
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1e3;
+  memoryStore.stories.push(
+    {
+      id: "story-seed-1",
+      userId: "m1000000-0000-0000-0000-000000000001",
+      mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
+      mediaType: "image",
+      duration: 5,
+      caption: "Sunset view over Kigali hills \u{1F304} Happy weekend!",
+      likesCount: 12,
+      createdAt: new Date(now - 2 * 60 * 60 * 1e3).toISOString(),
+      expiresAt: new Date(now + 22 * 60 * 60 * 1e3).toISOString()
+    },
+    {
+      id: "story-seed-2",
+      userId: "m2000000-0000-0000-0000-000000000002",
+      mediaUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80",
+      mediaType: "image",
+      duration: 5,
+      caption: "Morning 10km run on Mount Kigali \u{1F3C3}\u200D\u2642\uFE0F Specialty coffee next?",
+      likesCount: 9,
+      createdAt: new Date(now - 4 * 60 * 60 * 1e3).toISOString(),
+      expiresAt: new Date(now + 20 * 60 * 60 * 1e3).toISOString()
+    },
+    {
+      id: "story-seed-3",
+      userId: "m3000000-0000-0000-0000-000000000003",
+      mediaUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80",
+      mediaType: "image",
+      duration: 5,
+      caption: "Contemporary art exhibition in Kiyovu \u2728 Inspiring creators.",
+      likesCount: 18,
+      createdAt: new Date(now - 1 * 60 * 60 * 1e3).toISOString(),
+      expiresAt: new Date(now + 23 * 60 * 60 * 1e3).toISOString()
+    }
+  );
+  memoryStore.posts.push(
+    {
+      id: "post-seed-1",
+      userId: "m1000000-0000-0000-0000-000000000001",
+      caption: "Looking for recommendations for the best quiet coffee spots in Kimihurura or Kiyovu! Where is your favorite weekend reading haven? \u2615\uFE0F\u{1F1F7}\u{1F1FC}",
+      mediaUrls: ["https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80"],
+      feeling: "curious \u{1F4AD}",
+      location: "Kimihurura, Kigali",
+      likesCount: 19,
+      commentsCount: 3,
+      createdAt: new Date(now - 3 * 60 * 60 * 1e3).toISOString()
+    },
+    {
+      id: "post-seed-2",
+      userId: "m2000000-0000-0000-0000-000000000002",
+      caption: "Summit reached! Nothing beats starting your weekend early in our country of a thousand hills. Fresh air, great trails, and clarity of mind. \u{1F97E}\u26F0\uFE0F",
+      mediaUrls: ["https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80"],
+      feeling: "energized \u26A1\uFE0F",
+      location: "Mount Kigali, Rwanda",
+      likesCount: 34,
+      commentsCount: 5,
+      createdAt: new Date(now - 7 * 60 * 60 * 1e3).toISOString()
+    },
+    {
+      id: "post-seed-3",
+      userId: "m3000000-0000-0000-0000-000000000003",
+      caption: "Celebrating authentic Rwandan fashion and modern elegance. Proud of our local designers pushing boundaries globally! \u2728\u{1F1F7}\u{1F1FC}",
+      mediaUrls: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80"],
+      feeling: "inspired \u{1F31F}",
+      location: "Kigali Cultural Village",
+      likesCount: 42,
+      commentsCount: 8,
+      createdAt: new Date(now - 12 * 60 * 60 * 1e3).toISOString()
+    }
+  );
+  memoryStore.postComments.push(
+    {
+      id: "c-1",
+      postId: "post-seed-1",
+      userId: "m2000000-0000-0000-0000-000000000002",
+      content: "Inzora Rooftop Cafe or Question Coffee! Both have great atmosphere and views.",
+      createdAt: new Date(now - 2 * 60 * 60 * 1e3).toISOString()
+    },
+    {
+      id: "c-2",
+      postId: "post-seed-2",
+      userId: "m1000000-0000-0000-0000-000000000001",
+      content: "Count me in next time! Which trail did you take up?",
+      createdAt: new Date(now - 5 * 60 * 60 * 1e3).toISOString()
+    }
+  );
 }
-initMemoryStore();
 async function query(sql, params = []) {
   if (pgPool) {
     try {
@@ -488,7 +431,6 @@ async function query(sql, params = []) {
   }
   return null;
 }
-var settingsTableInitialized = false;
 async function ensureAdminSettingsTable() {
   if (settingsTableInitialized) return;
   try {
@@ -581,12 +523,600 @@ async function saveAdminSettingToDb(key, value) {
   }
   return true;
 }
-setTimeout(() => {
-  loadAdminSettingsFromDb().catch(() => {
-  });
-}, 500);
+var PgPool, dbUrl, isPostgres, isMysql, pgPool, mysqlPool, memoryStore, settingsTableInitialized;
+var init_db = __esm({
+  "api/_lib/db.ts"() {
+    "use strict";
+    dotenv.config();
+    ({ Pool: PgPool } = pg);
+    dbUrl = (process.env.DATABASE_URL || "").trim();
+    isPostgres = dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://");
+    isMysql = dbUrl.startsWith("mysql://") || Boolean(process.env.MYSQL_DATABASE || process.env.DB_NAME || process.env.MYSQL_HOST || process.env.DB_HOST);
+    pgPool = null;
+    mysqlPool = null;
+    if (isPostgres) {
+      try {
+        pgPool = new PgPool({
+          connectionString: dbUrl,
+          ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
+          max: 10,
+          idleTimeoutMillis: 3e4,
+          connectionTimeoutMillis: 5e3
+        });
+        pgPool.on("error", (err) => {
+          console.warn("PostgreSQL idle client error, keeping pool alive:", err);
+        });
+        console.log("\u{1F4E6} PostgreSQL connection pool initialized.");
+      } catch (pgErr) {
+        console.warn("\u26A0\uFE0F Could not initialize PostgreSQL pool, falling back to memory store:", pgErr);
+        pgPool = null;
+      }
+    } else if (isMysql) {
+      try {
+        if (dbUrl) {
+          mysqlPool = mysql.createPool({
+            uri: dbUrl,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0,
+            enableKeepAlive: true,
+            keepAliveInitialDelay: 1e4,
+            multipleStatements: true
+          });
+        } else {
+          mysqlPool = mysql.createPool({
+            host: process.env.MYSQL_HOST || process.env.DB_HOST || "127.0.0.1",
+            port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || "3306", 10),
+            user: process.env.MYSQL_USER || process.env.DB_USER || "root",
+            password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || "",
+            database: process.env.MYSQL_DATABASE || process.env.DB_NAME || "kunda_space",
+            ssl: process.env.MYSQL_SSL === "true" || process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : void 0,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0,
+            enableKeepAlive: true,
+            keepAliveInitialDelay: 1e4,
+            multipleStatements: true
+          });
+        }
+        console.log("\u{1F4E6} MySQL connection pool initialized.");
+      } catch (poolErr) {
+        console.warn("\u26A0\uFE0F Could not initialize MySQL pool, falling back to memory store:", poolErr);
+        mysqlPool = null;
+      }
+    }
+    memoryStore = {
+      users: [],
+      profiles: [],
+      photos: [],
+      preferences: [],
+      likes: [],
+      passes: [],
+      matches: [],
+      conversations: [],
+      messages: [],
+      allowances: /* @__PURE__ */ new Map(),
+      wallets: /* @__PURE__ */ new Map(),
+      transactions: [],
+      subscriptions: [],
+      contactUnlocks: [],
+      notifications: [],
+      moderationEvents: [],
+      reports: [],
+      adminSettings: /* @__PURE__ */ new Map(),
+      tutorials: [],
+      stories: [],
+      posts: [],
+      postComments: [],
+      postLikes: []
+    };
+    initMemoryStore();
+    settingsTableInitialized = false;
+    setTimeout(() => {
+      loadAdminSettingsFromDb().catch(() => {
+      });
+    }, 500);
+  }
+});
+
+// api/_lib/drive.ts
+function getDriveConfig() {
+  const settings = memoryStore.adminSettings;
+  return {
+    clientId: settings.get("google_drive_client_id") || process.env.GOOGLE_DRIVE_CLIENT_ID || "",
+    clientSecret: settings.get("google_drive_client_secret") || process.env.GOOGLE_DRIVE_CLIENT_SECRET || "",
+    refreshToken: settings.get("google_drive_refresh_token") || process.env.GOOGLE_DRIVE_REFRESH_TOKEN || "",
+    folderId: settings.get("google_drive_folder_id") || process.env.GOOGLE_DRIVE_FOLDER_ID || ""
+  };
+}
+async function getFreshAccessToken(config) {
+  if (!config.clientId || !config.clientSecret || !config.refreshToken) {
+    return null;
+  }
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        refresh_token: config.refreshToken,
+        grant_type: "refresh_token"
+      }).toString()
+    });
+    const data = await res.json();
+    if (res.ok && data.access_token) {
+      return data.access_token;
+    }
+    console.error("Google OAuth token refresh error:", data);
+    return null;
+  } catch (err) {
+    console.error("Failed to exchange Google Drive refresh token:", err);
+    return null;
+  }
+}
+async function uploadToGoogleDrive(fileBuffer, filename, mimeType = "image/jpeg") {
+  const config = getDriveConfig();
+  const accessToken = await getFreshAccessToken(config);
+  if (accessToken) {
+    try {
+      const metadata = {
+        name: `kunda_${Date.now()}_${filename}`,
+        mimeType
+      };
+      if (config.folderId) {
+        metadata.parents = [config.folderId];
+      }
+      const boundary = "-------314159265358979323846";
+      const delimiter = `\r
+--${boundary}\r
+`;
+      const closeDelimiter = `\r
+--${boundary}--`;
+      const metadataPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r
+\r
+${JSON.stringify(metadata)}`;
+      const mediaPart = `${delimiter}Content-Type: ${mimeType}\r
+Content-Transfer-Encoding: base64\r
+\r
+${Buffer.from(fileBuffer).toString("base64")}${closeDelimiter}`;
+      const multipartBody = metadataPart + mediaPart;
+      const uploadRes = await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`
+          },
+          body: multipartBody
+        }
+      );
+      const fileData = await uploadRes.json();
+      if (!uploadRes.ok || !fileData.id) {
+        return { success: false, url: "", error: fileData.error?.message || "Drive upload failed" };
+      }
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ role: "reader", type: "anyone" })
+        });
+      } catch (permErr) {
+        console.warn("Google Drive permission set warning:", permErr);
+      }
+      const directUrl = `https://lh3.googleusercontent.com/d/${fileData.id}`;
+      return { success: true, url: directUrl, fileId: fileData.id };
+    } catch (err) {
+      console.error("Google Drive upload execution error:", err);
+      return { success: false, url: "", error: err.message };
+    }
+  }
+  const base64Data = Buffer.from(fileBuffer).toString("base64");
+  const dataUri = `data:${mimeType};base64,${base64Data}`;
+  return {
+    success: true,
+    url: dataUri,
+    fileId: `mock-drive-${Date.now()}`
+  };
+}
+async function uploadBackupToGoogleDrive(fileBuffer, filename, mimeType = "application/sql") {
+  const config = getDriveConfig();
+  const accessToken = await getFreshAccessToken(config);
+  if (accessToken) {
+    try {
+      const metadata = {
+        name: filename,
+        mimeType,
+        description: `Kunda Space MySQL Automated Database Backup generated on ${(/* @__PURE__ */ new Date()).toISOString()}`
+      };
+      if (config.folderId) {
+        metadata.parents = [config.folderId];
+      }
+      const boundary = "-------314159265358979323846";
+      const delimiter = `\r
+--${boundary}\r
+`;
+      const closeDelimiter = `\r
+--${boundary}--`;
+      const metadataPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r
+\r
+${JSON.stringify(metadata)}`;
+      const mediaPart = `${delimiter}Content-Type: ${mimeType}\r
+Content-Transfer-Encoding: base64\r
+\r
+${Buffer.from(fileBuffer).toString("base64")}${closeDelimiter}`;
+      const multipartBody = metadataPart + mediaPart;
+      const uploadRes = await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`
+          },
+          body: multipartBody
+        }
+      );
+      const fileData = await uploadRes.json();
+      if (!uploadRes.ok || !fileData.id) {
+        return { success: false, url: "", error: fileData.error?.message || "Google Drive backup upload failed" };
+      }
+      return {
+        success: true,
+        url: fileData.webViewLink || fileData.webContentLink || `https://drive.google.com/file/d/${fileData.id}/view`,
+        webViewLink: fileData.webViewLink || `https://drive.google.com/file/d/${fileData.id}/view`,
+        fileId: fileData.id
+      };
+    } catch (err) {
+      console.error("Google Drive backup upload error:", err);
+      return { success: false, url: "", error: err.message };
+    }
+  }
+  return {
+    success: false,
+    url: "",
+    error: "Google Drive credentials not configured. Please set GOOGLE_DRIVE_CLIENT_ID, CLIENT_SECRET, and REFRESH_TOKEN in Admin Settings or .env"
+  };
+}
+var init_drive = __esm({
+  "api/_lib/drive.ts"() {
+    "use strict";
+    init_db();
+  }
+});
+
+// scripts/backup-db.ts
+var backup_db_exports = {};
+__export(backup_db_exports, {
+  runDatabaseBackup: () => runDatabaseBackup
+});
+import fs from "fs";
+import path from "path";
+import crypto13 from "crypto";
+import mysql2 from "mysql2/promise";
+import dotenv2 from "dotenv";
+import { fileURLToPath } from "url";
+function escapeSqlValue(val) {
+  if (val === null || val === void 0) {
+    return "NULL";
+  }
+  if (typeof val === "number") {
+    return Number.isFinite(val) ? val.toString() : "NULL";
+  }
+  if (typeof val === "bigint") {
+    return val.toString();
+  }
+  if (typeof val === "boolean") {
+    return val ? "1" : "0";
+  }
+  if (val instanceof Date) {
+    return `'${val.toISOString().slice(0, 19).replace("T", " ")}'`;
+  }
+  if (Buffer.isBuffer(val)) {
+    return `X'${val.toString("hex")}'`;
+  }
+  if (typeof val === "object") {
+    const jsonStr = JSON.stringify(val);
+    return `'${jsonStr.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\0/g, "\\0")}'`;
+  }
+  const str = String(val);
+  return `'${str.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\0/g, "\\0").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x1a/g, "\\Z")}'`;
+}
+async function runDatabaseBackup(options = {}) {
+  const force = options.force || process.argv.includes("--force") || process.argv.includes("-f");
+  console.log("=============================================================");
+  console.log(`\u{1F4E6} KUNDA SPACE: MySQL Database Backup Runner ${force ? "[FORCED]" : ""}`);
+  console.log(`\u23F0 Time: ${(/* @__PURE__ */ new Date()).toISOString()}`);
+  console.log("=============================================================");
+  const dbUrl2 = process.env.DATABASE_URL;
+  const host = process.env.MYSQL_HOST || process.env.DB_HOST || "127.0.0.1";
+  const user = process.env.MYSQL_USER || process.env.DB_USER || "root";
+  const password = process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || "";
+  const database = process.env.MYSQL_DATABASE || process.env.DB_NAME || "kunda_space";
+  const port = parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || "3306", 10);
+  let connection = null;
+  try {
+    if (dbUrl2) {
+      connection = await mysql2.createConnection({ uri: dbUrl2 });
+    } else {
+      connection = await mysql2.createConnection({
+        host,
+        port,
+        user,
+        password,
+        database
+      });
+    }
+    console.log(`\u2705 Connected to MySQL database "${database}" on ${host}:${port}.`);
+  } catch (connErr) {
+    console.error("\u274C Failed to connect to MySQL database:", connErr.message);
+    return { success: false, error: connErr.message };
+  }
+  try {
+    const [tablesRes] = await connection.query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
+    const tables = tablesRes.map((r) => Object.values(r)[0]);
+    if (tables.length === 0) {
+      console.warn("\u26A0\uFE0F No tables found in database to backup.");
+      return { success: false, error: "Database has no tables." };
+    }
+    console.log(`\u{1F4CB} Found ${tables.length} tables to evaluate.`);
+    const checksumParts = [];
+    let totalRowCount = 0;
+    for (const table of tables) {
+      try {
+        const [cntRes] = await connection.query(`SELECT COUNT(*) AS cnt FROM \`${table}\``);
+        const count = cntRes[0]?.cnt || 0;
+        totalRowCount += Number(count);
+        const [chkRes] = await connection.query(`CHECKSUM TABLE \`${table}\``);
+        const checksum = chkRes[0]?.Checksum || 0;
+        checksumParts.push(`${table}:${count}:${checksum}`);
+      } catch (chkErr) {
+        checksumParts.push(`${table}:fallback`);
+      }
+    }
+    const currentHash = crypto13.createHash("sha256").update(checksumParts.join("|")).digest("hex");
+    const backupsDir = path.resolve(__dirname, "../backups");
+    if (!fs.existsSync(backupsDir)) {
+      fs.mkdirSync(backupsDir, { recursive: true });
+    }
+    const stateFile = path.join(backupsDir, ".last_backup_meta.json");
+    let lastMeta = null;
+    if (fs.existsSync(stateFile)) {
+      try {
+        lastMeta = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+      } catch (e) {
+        lastMeta = null;
+      }
+    }
+    if (!force && lastMeta && lastMeta.checksumHash === currentHash) {
+      console.log("-------------------------------------------------------------");
+      console.log("\u2139\uFE0F  DATABASE UNCHANGED:");
+      console.log(`    Last backup: ${lastMeta.lastBackupTime}`);
+      console.log(`    File: ${lastMeta.lastBackupFile}`);
+      console.log("    No database changes detected. Skipping duplicate backup.");
+      console.log("-------------------------------------------------------------");
+      return {
+        success: true,
+        skipped: true,
+        reason: "Database contents unchanged since last backup.",
+        lastBackupFile: lastMeta.lastBackupFile
+      };
+    }
+    console.log("\u{1F504} Database changes detected! Generating .sql backup...");
+    const timestampStr = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace("T", "_").slice(0, 15);
+    const backupFileName = `kunda_backup_${timestampStr}.sql`;
+    const localFilePath = path.join(backupsDir, backupFileName);
+    let sqlDump = "";
+    sqlDump += `-- =============================================================
+`;
+    sqlDump += `-- Kunda Space MySQL Database Backup
+`;
+    sqlDump += `-- Generated: ${(/* @__PURE__ */ new Date()).toISOString()}
+`;
+    sqlDump += `-- Database: ${database}
+`;
+    sqlDump += `-- Total Tables: ${tables.length}
+`;
+    sqlDump += `-- Total Rows: ${totalRowCount}
+`;
+    sqlDump += `-- =============================================================
+
+`;
+    sqlDump += `SET NAMES utf8mb4;
+`;
+    sqlDump += `SET FOREIGN_KEY_CHECKS = 0;
+`;
+    sqlDump += `SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+`;
+    sqlDump += `SET time_zone = "+00:00";
+
+`;
+    for (const table of tables) {
+      sqlDump += `-- -------------------------------------------------------------
+`;
+      sqlDump += `-- Table structure and data for table \`${table}\`
+`;
+      sqlDump += `-- -------------------------------------------------------------
+`;
+      sqlDump += `DROP TABLE IF EXISTS \`${table}\`;
+`;
+      const [createRes] = await connection.query(`SHOW CREATE TABLE \`${table}\``);
+      const createTableSql = createRes[0]["Create Table"];
+      sqlDump += `${createTableSql};
+
+`;
+      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
+      if (rows && rows.length > 0) {
+        sqlDump += `LOCK TABLES \`${table}\` WRITE;
+`;
+        const chunkSize = 100;
+        const columns = Object.keys(rows[0]);
+        const colList = columns.map((c) => `\`${c}\``).join(", ");
+        for (let i = 0; i < rows.length; i += chunkSize) {
+          const chunk = rows.slice(i, i + chunkSize);
+          const valuesList = chunk.map((row) => `(${columns.map((c) => escapeSqlValue(row[c])).join(", ")})`).join(",\n");
+          sqlDump += `INSERT INTO \`${table}\` (${colList}) VALUES
+${valuesList};
+`;
+        }
+        sqlDump += `UNLOCK TABLES;
+
+`;
+      }
+    }
+    sqlDump += `SET FOREIGN_KEY_CHECKS = 1;
+`;
+    sqlDump += `-- Dump completed on ${(/* @__PURE__ */ new Date()).toISOString()}
+`;
+    fs.writeFileSync(localFilePath, sqlDump, "utf8");
+    const fileStats = fs.statSync(localFilePath);
+    console.log(`\u{1F4BE} Local backup saved: ${backupFileName} (${(fileStats.size / 1024).toFixed(2)} KB)`);
+    const fileBuffer = fs.readFileSync(localFilePath);
+    const driveResult = await uploadBackupToGoogleDrive(fileBuffer, backupFileName, "application/sql");
+    if (driveResult.success) {
+      console.log("\u2705 Google Drive upload successful!");
+      console.log(`   File ID: ${driveResult.fileId}`);
+      console.log(`   Link: ${driveResult.webViewLink || driveResult.url}`);
+    } else {
+      console.warn("\u26A0\uFE0F Google Drive upload notice:", driveResult.error);
+    }
+    const newMeta = {
+      lastBackupTime: (/* @__PURE__ */ new Date()).toISOString(),
+      lastBackupFile: backupFileName,
+      localFilePath,
+      fileSizeBytes: fileStats.size,
+      totalTables: tables.length,
+      totalRows: totalRowCount,
+      checksumHash: currentHash,
+      driveUploaded: driveResult.success,
+      driveFileId: driveResult.fileId || null,
+      driveViewUrl: driveResult.webViewLink || driveResult.url || null
+    };
+    fs.writeFileSync(stateFile, JSON.stringify(newMeta, null, 2), "utf8");
+    return {
+      success: true,
+      backupFile: backupFileName,
+      localFilePath,
+      sizeBytes: fileStats.size,
+      driveResult
+    };
+  } catch (err) {
+    console.error("\u274C Backup failure:", err);
+    return { success: false, error: err.message };
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+}
+var __filename, __dirname;
+var init_backup_db = __esm({
+  "scripts/backup-db.ts"() {
+    "use strict";
+    init_drive();
+    dotenv2.config();
+    __filename = fileURLToPath(import.meta.url);
+    __dirname = path.dirname(__filename);
+    if (process.argv[1] && process.argv[1].endsWith("backup-db.ts")) {
+      runDatabaseBackup().then((r) => {
+        if (!r.success) process.exit(1);
+      }).catch((e) => {
+        console.error(e);
+        process.exit(1);
+      });
+    }
+  }
+});
+
+// api/_routes/auth/register.ts
+import crypto from "crypto";
+
+// api/_lib/auth.ts
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+// api/_lib/config.ts
+var BUSINESS_CONFIG = {
+  // Free messaging limits
+  FREE_INITIAL_MESSAGES: 3,
+  FREE_DISTINCT_RECIPIENTS: 3,
+  FREE_REPLIES_ALLOWED: 3,
+  // Costs (in minor units: 1 RWF = 1 unit or cents)
+  HOURLY_PASS_PRICE_RWF: 500,
+  THREE_DAY_PASS_PRICE_RWF: 1500,
+  WEEKLY_PASS_PRICE_RWF: 3e3,
+  PAY_PER_MESSAGE_PRICE_RWF: 150,
+  CONTACT_UNLOCK_PRICE_RWF: 2e3,
+  DEFAULT_CURRENCY: "RWF",
+  // Algorithm weights (0-100)
+  MATCHING_WEIGHTS: {
+    INTENTION: 0.25,
+    AGE: 0.2,
+    LOCATION: 0.15,
+    INTERESTS: 0.15,
+    LANGUAGE: 0.1,
+    LIFESTYLE: 0.1,
+    OTHER: 0.05
+  },
+  // Minimum required age by law
+  MINIMUM_AGE_YEARS: 18
+};
+
+// api/_lib/auth.ts
+var JWT_SECRET = process.env.JWT_SECRET || "kunda-space-super-secure-production-jwt-token-2026";
+var JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+function calculateAge(dobString) {
+  if (!dobString) return 0;
+  const dob = new Date(dobString);
+  if (isNaN(dob.getTime())) return 0;
+  const today = /* @__PURE__ */ new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || m === 0 && today.getDate() < dob.getDate()) {
+    age--;
+  }
+  return age;
+}
+function isAdult(dobString) {
+  return calculateAge(dobString) >= BUSINESS_CONFIG.MINIMUM_AGE_YEARS;
+}
+async function hashPassword(plainText) {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(plainText, salt);
+}
+async function comparePassword(plainText, hash) {
+  return bcrypt.compare(plainText, hash);
+}
+function generateToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+}
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return null;
+  }
+}
+function extractAuthUser(req) {
+  const authHeader = req.headers?.authorization || req.headers?.Authorization;
+  if (!authHeader || typeof authHeader !== "string") return null;
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") return null;
+  return verifyToken(parts[1]);
+}
+function isAuthorizedRole(userRole, requiredRoles) {
+  return requiredRoles.includes(userRole);
+}
+
+// api/_routes/auth/register.ts
+init_db();
 
 // api/_lib/email.ts
+init_db();
 import nodemailer from "nodemailer";
 function getEmailConfig() {
   const settings = memoryStore.adminSettings;
@@ -927,6 +1457,7 @@ async function handler(req, res) {
 }
 
 // api/_routes/auth/login.ts
+init_db();
 async function handler2(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -1046,7 +1577,11 @@ async function handler2(req, res) {
   }
 }
 
+// api/_routes/auth/me.ts
+init_db();
+
 // api/_lib/wallet.ts
+init_db();
 import crypto2 from "crypto";
 async function getWalletBalance(userId) {
   const res = await query("SELECT balance_minor, currency FROM wallets WHERE user_id = $1", [userId]);
@@ -1184,11 +1719,19 @@ async function handler3(req, res) {
   }
   const profile = memoryStore.profiles.find((p) => p.userId === auth.userId);
   const wallet = await getWalletBalance(auth.userId);
-  const allowances = memoryStore.allowances.get(auth.userId) || {
-    initialRemaining: 3,
-    distinctRecipients: [],
-    repliesRemaining: 3
-  };
+  await loadAdminSettingsFromDb();
+  const freeInitLimit = Number(memoryStore.adminSettings.get("free_initial_messages") ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+  const freeDistinctLimit = Number(memoryStore.adminSettings.get("free_distinct_recipients") ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+  const freeRepliesLimit = Number(memoryStore.adminSettings.get("free_replies") ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+  let allowances = memoryStore.allowances.get(auth.userId);
+  if (!allowances) {
+    allowances = {
+      initialRemaining: freeInitLimit,
+      distinctRecipients: [],
+      repliesRemaining: freeRepliesLimit
+    };
+    memoryStore.allowances.set(auth.userId, allowances);
+  }
   const activeSub = memoryStore.subscriptions.find(
     (s) => s.userId === auth.userId && s.status === "active" && new Date(s.expiresAt) > /* @__PURE__ */ new Date()
   );
@@ -1221,6 +1764,7 @@ async function handler3(req, res) {
 }
 
 // api/_routes/auth/verify-email.ts
+init_db();
 import crypto3 from "crypto";
 async function handler4(req, res) {
   if (req.method !== "POST") {
@@ -1309,6 +1853,7 @@ async function handler4(req, res) {
 }
 
 // api/_routes/auth/forgot-password.ts
+init_db();
 import crypto4 from "crypto";
 async function handler5(req, res) {
   if (req.method !== "POST") {
@@ -1320,26 +1865,55 @@ async function handler5(req, res) {
       return res.status(400).json({ success: false, error: "Email address is required" });
     }
     const normalizedEmail = email.toLowerCase().trim();
-    const user = memoryStore.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+    let user = memoryStore.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+    if (!user) {
+      const dbRes = await query("SELECT * FROM users WHERE LOWER(email) = LOWER($1)", [normalizedEmail]);
+      if (dbRes?.rows?.[0]) {
+        user = dbRes.rows[0];
+        memoryStore.users.push(user);
+      }
+    }
     if (user) {
       const resetCode = Math.floor(1e5 + Math.random() * 9e5).toString();
       const resetToken = crypto4.randomBytes(32).toString("hex");
+      const resetExpiresAt = new Date(Date.now() + 60 * 60 * 1e3).toISOString();
       user.resetCode = resetCode;
       user.resetToken = resetToken;
-      user.resetExpiresAt = new Date(Date.now() + 60 * 60 * 1e3).toISOString();
-      const profile = memoryStore.profiles.find((p) => p.userId === user.id);
-      const displayName = profile?.displayName || "Kunda Space Member";
-      const appUrl = process.env.APP_URL || "http://localhost:5173";
+      user.resetExpiresAt = resetExpiresAt;
+      await query(
+        "UPDATE users SET reset_code = $1, reset_token = $2, reset_expires_at = $3 WHERE id = $4",
+        [resetCode, resetToken, resetExpiresAt, user.id]
+      ).catch(() => {
+      });
+      let profile = memoryStore.profiles.find((p) => p.userId === user.id);
+      if (!profile) {
+        const pRes = await query("SELECT * FROM profiles WHERE user_id = $1", [user.id]);
+        if (pRes?.rows?.[0]) profile = pRes.rows[0];
+      }
+      const displayName = profile?.displayName || profile?.display_name || user.displayName || "Kunda Space Member";
+      const proto = req.headers && req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers && (req.headers["x-forwarded-host"] || req.headers.host) || "kunda-rose.vercel.app";
+      const appUrl = process.env.APP_URL || `${proto}://${host}`;
+      let emailSent = false;
+      let emailError = void 0;
       try {
-        await sendPasswordResetEmail(user.email, displayName, resetCode, resetToken, appUrl);
+        const emailRes = await sendPasswordResetEmail(user.email, displayName, resetCode, resetToken, appUrl);
+        emailSent = emailRes.success;
+        if (!emailRes.success) {
+          emailError = emailRes.error;
+          console.warn("\u26A0\uFE0F Password reset email delivery returned error:", emailRes.error);
+        }
       } catch (emailErr) {
-        console.warn("Password reset email dispatch error:", emailErr);
+        emailError = emailErr?.message || String(emailErr);
+        console.warn("\u26A0\uFE0F Password reset email dispatch caught exception:", emailError);
       }
       return res.status(200).json({
         success: true,
         message: "If an account exists with this email, a 6-digit reset code and recovery link have been dispatched.",
-        resetCode
-        // Returned for instant prototype testing
+        resetCode,
+        // Provided for instant prototype testing / preview
+        emailSent,
+        providerNotice: emailError || void 0
       });
     }
     return res.status(200).json({
@@ -1353,6 +1927,7 @@ async function handler5(req, res) {
 }
 
 // api/_routes/auth/reset-password.ts
+init_db();
 async function handler6(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -1368,17 +1943,35 @@ async function handler6(req, res) {
     let user = null;
     if (token) {
       user = memoryStore.users.find((u) => u.resetToken === token);
+      if (!user) {
+        const uRes = await query("SELECT * FROM users WHERE reset_token = $1", [token]);
+        if (uRes?.rows?.[0]) {
+          user = uRes.rows[0];
+          memoryStore.users.push(user);
+        }
+      }
     } else if (email) {
-      user = memoryStore.users.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
+      const normalizedEmail = email.toLowerCase().trim();
+      user = memoryStore.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+      if (!user) {
+        const uRes = await query("SELECT * FROM users WHERE LOWER(email) = LOWER($1)", [normalizedEmail]);
+        if (uRes?.rows?.[0]) {
+          user = uRes.rows[0];
+          memoryStore.users.push(user);
+        }
+      }
     }
     if (!user) {
       return res.status(404).json({ success: false, error: "Account not found or recovery token is invalid" });
     }
-    if (user.resetExpiresAt && new Date(user.resetExpiresAt) < /* @__PURE__ */ new Date()) {
+    const resetExpiresAt = user.resetExpiresAt || user.reset_expires_at;
+    if (resetExpiresAt && new Date(resetExpiresAt) < /* @__PURE__ */ new Date()) {
       return res.status(400).json({ success: false, error: "Reset code has expired. Please request a new one." });
     }
-    const isCodeMatch = code && user.resetCode === code.toString().trim();
-    const isTokenMatch = token && user.resetToken === token;
+    const storedCode = (user.resetCode || user.reset_code)?.toString().trim();
+    const storedToken = user.resetToken || user.reset_token;
+    const isCodeMatch = code && storedCode === code.toString().trim();
+    const isTokenMatch = token && storedToken === token;
     if (!isCodeMatch && !isTokenMatch) {
       return res.status(400).json({ success: false, error: "Invalid reset code. Please check your email." });
     }
@@ -1387,7 +1980,8 @@ async function handler6(req, res) {
     user.resetCode = null;
     user.resetToken = null;
     user.resetExpiresAt = null;
-    await query("UPDATE users SET password_hash = $1 WHERE id = $2", [newHash, user.id]);
+    await query("UPDATE users SET password_hash = $1, reset_code = NULL, reset_token = NULL, reset_expires_at = NULL WHERE id = $2", [newHash, user.id]).catch(() => {
+    });
     return res.status(200).json({
       success: true,
       message: "Your password has been successfully reset. You can now sign in with your new password."
@@ -1398,112 +1992,8 @@ async function handler6(req, res) {
   }
 }
 
-// api/_lib/drive.ts
-function getDriveConfig() {
-  const settings = memoryStore.adminSettings;
-  return {
-    clientId: settings.get("google_drive_client_id") || process.env.GOOGLE_DRIVE_CLIENT_ID || "",
-    clientSecret: settings.get("google_drive_client_secret") || process.env.GOOGLE_DRIVE_CLIENT_SECRET || "",
-    refreshToken: settings.get("google_drive_refresh_token") || process.env.GOOGLE_DRIVE_REFRESH_TOKEN || "",
-    folderId: settings.get("google_drive_folder_id") || process.env.GOOGLE_DRIVE_FOLDER_ID || ""
-  };
-}
-async function getFreshAccessToken(config) {
-  if (!config.clientId || !config.clientSecret || !config.refreshToken) {
-    return null;
-  }
-  try {
-    const res = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        refresh_token: config.refreshToken,
-        grant_type: "refresh_token"
-      }).toString()
-    });
-    const data = await res.json();
-    if (res.ok && data.access_token) {
-      return data.access_token;
-    }
-    console.error("Google OAuth token refresh error:", data);
-    return null;
-  } catch (err) {
-    console.error("Failed to exchange Google Drive refresh token:", err);
-    return null;
-  }
-}
-async function uploadToGoogleDrive(fileBuffer, filename, mimeType = "image/jpeg") {
-  const config = getDriveConfig();
-  const accessToken = await getFreshAccessToken(config);
-  if (accessToken) {
-    try {
-      const metadata = {
-        name: `kunda_${Date.now()}_${filename}`,
-        mimeType
-      };
-      if (config.folderId) {
-        metadata.parents = [config.folderId];
-      }
-      const boundary = "-------314159265358979323846";
-      const delimiter = `\r
---${boundary}\r
-`;
-      const closeDelimiter = `\r
---${boundary}--`;
-      const metadataPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r
-\r
-${JSON.stringify(metadata)}`;
-      const mediaPart = `${delimiter}Content-Type: ${mimeType}\r
-Content-Transfer-Encoding: base64\r
-\r
-${Buffer.from(fileBuffer).toString("base64")}${closeDelimiter}`;
-      const multipartBody = metadataPart + mediaPart;
-      const uploadRes = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": `multipart/related; boundary=${boundary}`
-          },
-          body: multipartBody
-        }
-      );
-      const fileData = await uploadRes.json();
-      if (!uploadRes.ok || !fileData.id) {
-        return { success: false, url: "", error: fileData.error?.message || "Drive upload failed" };
-      }
-      try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ role: "reader", type: "anyone" })
-        });
-      } catch (permErr) {
-        console.warn("Google Drive permission set warning:", permErr);
-      }
-      const directUrl = `https://lh3.googleusercontent.com/d/${fileData.id}`;
-      return { success: true, url: directUrl, fileId: fileData.id };
-    } catch (err) {
-      console.error("Google Drive upload execution error:", err);
-      return { success: false, url: "", error: err.message };
-    }
-  }
-  const base64Data = Buffer.from(fileBuffer).toString("base64");
-  const dataUri = `data:${mimeType};base64,${base64Data}`;
-  return {
-    success: true,
-    url: dataUri,
-    fileId: `mock-drive-${Date.now()}`
-  };
-}
-
 // api/_routes/upload/index.ts
+init_drive();
 async function handler7(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -1545,6 +2035,7 @@ async function handler7(req, res) {
 
 // api/_routes/tutorials/index.ts
 import crypto5 from "crypto";
+init_db();
 async function handler8(req, res) {
   if (req.method === "GET") {
     const stepTag = req.query?.step;
@@ -1616,6 +2107,9 @@ async function handler8(req, res) {
   }
   return res.status(405).json({ success: false, error: "Method not allowed" });
 }
+
+// api/_routes/members/discover.ts
+init_db();
 
 // api/_lib/matching.ts
 function checkHardEligibility(user, candidate) {
@@ -1833,6 +2327,7 @@ async function handler9(req, res) {
 
 // api/_routes/members/interaction.ts
 import crypto6 from "crypto";
+init_db();
 async function handler10(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -1983,6 +2478,7 @@ async function handler10(req, res) {
 }
 
 // api/_routes/members/matches.ts
+init_db();
 async function handler11(req, res) {
   const auth = extractAuthUser(req);
   if (!auth) {
@@ -2069,11 +2565,30 @@ async function handler11(req, res) {
 }
 
 // api/_routes/messages/conversations.ts
+init_db();
 async function handler12(req, res) {
   const auth = extractAuthUser(req);
   if (!auth) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
+  await loadAdminSettingsFromDb();
+  const freeInitLimit = Number(memoryStore.adminSettings.get("free_initial_messages") ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+  const freeDistinctLimit = Number(memoryStore.adminSettings.get("free_distinct_recipients") ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+  const freeRepliesLimit = Number(memoryStore.adminSettings.get("free_replies") ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+  const contactUnlockPrice = Number(memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
+  const payPerMessagePrice = Number(memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF);
+  let userAllowances = memoryStore.allowances.get(auth.userId);
+  if (!userAllowances) {
+    userAllowances = {
+      initialRemaining: freeInitLimit,
+      distinctRecipients: [],
+      repliesRemaining: freeRepliesLimit
+    };
+    memoryStore.allowances.set(auth.userId, userAllowances);
+  }
+  const activeSub = memoryStore.subscriptions.find(
+    (s) => s.userId === auth.userId && s.status === "active" && new Date(s.expiresAt) > /* @__PURE__ */ new Date()
+  );
   const userMessages = memoryStore.messages.filter(
     (m) => m.senderId === auth.userId || m.recipientId === auth.userId
   );
@@ -2122,11 +2637,25 @@ async function handler12(req, res) {
     });
   }
   conversationList.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
-  return res.status(200).json({ success: true, conversations: conversationList });
+  return res.status(200).json({
+    success: true,
+    conversations: conversationList,
+    allowances: userAllowances,
+    hasActiveSubscription: Boolean(activeSub),
+    contactUnlockPrice,
+    settings: {
+      freeInitialMessages: freeInitLimit,
+      freeReplies: freeRepliesLimit,
+      freeDistinctRecipients: freeDistinctLimit,
+      contactUnlockPrice,
+      payPerMessagePrice
+    }
+  });
 }
 
 // api/_routes/messages/send.ts
 import crypto7 from "crypto";
+init_db();
 
 // api/_lib/moderation.ts
 var EN_NUMBER_WORDS = {
@@ -2333,11 +2862,18 @@ async function handler13(req, res) {
         m.readAt = (/* @__PURE__ */ new Date()).toISOString();
       }
     }
-    const allowances = memoryStore.allowances.get(auth.userId) || {
-      initialRemaining: 3,
-      distinctRecipients: [],
-      repliesRemaining: 3
-    };
+    const freeInitLimit = Number(memoryStore.adminSettings.get("free_initial_messages") ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+    const freeDistinctLimit = Number(memoryStore.adminSettings.get("free_distinct_recipients") ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
+    const freeRepliesLimit = Number(memoryStore.adminSettings.get("free_replies") ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+    let allowances = memoryStore.allowances.get(auth.userId);
+    if (!allowances) {
+      allowances = {
+        initialRemaining: freeInitLimit,
+        distinctRecipients: [],
+        repliesRemaining: freeRepliesLimit
+      };
+      memoryStore.allowances.set(auth.userId, allowances);
+    }
     const wallet = await getWalletBalance(auth.userId);
     const activeSub = memoryStore.subscriptions.find(
       (s) => s.userId === auth.userId && s.status === "active" && new Date(s.expiresAt) > /* @__PURE__ */ new Date()
@@ -2505,6 +3041,7 @@ async function handler13(req, res) {
 
 // api/_routes/messages/unlock-contact.ts
 import crypto8 from "crypto";
+init_db();
 async function handler14(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -2643,6 +3180,9 @@ async function handler16(req, res) {
   });
 }
 
+// api/_routes/payments/initialize.ts
+init_db();
+
 // api/_lib/flutterwave.ts
 import crypto9 from "crypto";
 var FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "FLWSECK_TEST-mock-secret-key-kunda";
@@ -2758,6 +3298,7 @@ async function handler17(req, res) {
 }
 
 // api/_routes/payments/webhook.ts
+init_db();
 import crypto10 from "crypto";
 async function handler18(req, res) {
   if (req.method !== "POST") {
@@ -2806,6 +3347,7 @@ async function handler18(req, res) {
 }
 
 // api/_routes/payments/verify.ts
+init_db();
 import crypto11 from "crypto";
 async function handler19(req, res) {
   if (req.method !== "POST") {
@@ -2860,6 +3402,7 @@ async function handler19(req, res) {
 }
 
 // api/_routes/subscriptions/plans.ts
+init_db();
 async function handler20(req, res) {
   await loadAdminSettingsFromDb();
   const hourlyPrice = Number(memoryStore.adminSettings.get("hourly_pass_cost") ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF);
@@ -2868,22 +3411,27 @@ async function handler20(req, res) {
   const payPerMessagePrice = Number(memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF);
   const contactUnlockPrice = Number(memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF);
   const currency = memoryStore.adminSettings.get("default_currency") || BUSINESS_CONFIG.DEFAULT_CURRENCY;
+  const freeInitialMessages = Number(memoryStore.adminSettings.get("free_initial_messages") ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES);
+  const freeReplies = Number(memoryStore.adminSettings.get("free_replies") ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED);
+  const freeDistinctRecipients = Number(memoryStore.adminSettings.get("free_distinct_recipients") ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS);
   const plans = [
     {
       code: "free",
       name_en: "Free Starter",
       name_rw: "Ibanze ku Buntu",
       name_fr: "D\xE9butant Gratuit",
-      description_en: "Explore verified members, 3 free messages to new people and 3 free replies.",
-      description_rw: "Reba abanyamuryango, ubutumwa 3 ku buntu ku bantu bashya n'ibisubizo 3.",
-      description_fr: "Explorez les profils v\xE9rifi\xE9s, 3 messages gratuits et 3 r\xE9ponses gratuites.",
+      description_en: `Explore verified members, ${freeInitialMessages} free messages to new people and ${freeReplies} free replies.`,
+      description_rw: `Reba abanyamuryango, ubutumwa ${freeInitialMessages} ku buntu ku bantu bashya n'ibisubizo ${freeReplies}.`,
+      description_fr: `Explorez les profils v\xE9rifi\xE9s, ${freeInitialMessages} messages gratuits et ${freeReplies} r\xE9ponses gratuites.`,
       price: 0,
       currency,
       durationDays: 0,
+      freeInitialMessages,
+      freeReplies,
       features: [
         "Complete Profile Setup",
-        "3 Free Outgoing Messages",
-        "3 Free Conversation Replies",
+        `${freeInitialMessages} Free Outgoing Messages`,
+        `${freeReplies} Free Conversation Replies`,
         "Algorithmic Compatibility Breakdown"
       ]
     },
@@ -2892,9 +3440,9 @@ async function handler20(req, res) {
       name_en: "Hourly Pass (24 Hours)",
       name_rw: "Pass y'Amasaha 24",
       name_fr: "Pass Connexion 24 Heures",
-      description_en: `Unlimited messaging for 24 hours. Quick connection boost for ${hourlyPrice} ${currency}.`,
-      description_rw: `Ubutumwa budafite umupaka mu masaha 24 kuri ${hourlyPrice} ${currency}.`,
-      description_fr: `Messagerie illimit\xE9e pendant 24 heures pour ${hourlyPrice} ${currency}.`,
+      description_en: `Unlimited messaging for 24 hours. Quick connection boost for ${hourlyPrice.toLocaleString()} ${currency}.`,
+      description_rw: `Ubutumwa budafite umupaka mu masaha 24 kuri ${hourlyPrice.toLocaleString()} ${currency}.`,
+      description_fr: `Messagerie illimit\xE9e pendant 24 heures pour ${hourlyPrice.toLocaleString()} ${currency}.`,
       price: hourlyPrice,
       currency,
       durationDays: 1,
@@ -2910,9 +3458,9 @@ async function handler20(req, res) {
       name_en: "3-Day Connection Pass",
       name_rw: "Icyumweru Gitoya (Iminsi 3)",
       name_fr: "Pass Connexion 3 Jours",
-      description_en: `Unlimited messaging for 72 hours. Perfect for weekend romance (${threeDayPrice} ${currency}).`,
-      description_rw: `Ubutumwa budafite umupaka mu masaha 72 kuri ${threeDayPrice} ${currency}. Byiza ku mpera z'icyumweru.`,
-      description_fr: `Messagerie illimit\xE9e pendant 72 heures (${threeDayPrice} ${currency}). Id\xE9al pour le week-end.`,
+      description_en: `Unlimited messaging for 72 hours. Perfect for weekend romance (${threeDayPrice.toLocaleString()} ${currency}).`,
+      description_rw: `Ubutumwa budafite umupaka mu masaha 72 kuri ${threeDayPrice.toLocaleString()} ${currency}. Byiza ku mpera z'icyumweru.`,
+      description_fr: `Messagerie illimit\xE9e pendant 72 heures (${threeDayPrice.toLocaleString()} ${currency}). Id\xE9al pour le week-end.`,
       price: threeDayPrice,
       currency,
       durationDays: 3,
@@ -2929,9 +3477,9 @@ async function handler20(req, res) {
       name_en: "Weekly Premium",
       name_rw: "Icyumweru Cyose",
       name_fr: "Pass Hebdomadaire Premium",
-      description_en: `Full access for 7 days with priority discovery and unlimited messaging (${weeklyPrice} ${currency}).`,
-      description_rw: `Kuganira bidahagarara icyumweru cyose no kugaragara mbere kuri ${weeklyPrice} ${currency}.`,
-      description_fr: `Acc\xE8s illimit\xE9 pendant 7 jours avec visibilit\xE9 prioritaire (${weeklyPrice} ${currency}).`,
+      description_en: `Full access for 7 days with priority discovery and unlimited messaging (${weeklyPrice.toLocaleString()} ${currency}).`,
+      description_rw: `Kuganira bidahagarara icyumweru cyose no kugaragara mbere kuri ${weeklyPrice.toLocaleString()} ${currency}.`,
+      description_fr: `Acc\xE8s illimit\xE9 pendant 7 jours avec visibilit\xE9 prioritaire (${weeklyPrice.toLocaleString()} ${currency}).`,
       price: weeklyPrice,
       currency,
       durationDays: 7,
@@ -2947,9 +3495,9 @@ async function handler20(req, res) {
       name_en: "Pay-Per-Message",
       name_rw: "Kwishyura Buri Butumwa",
       name_fr: "Paiement Par Message",
-      description_en: `Pay ${payPerMessagePrice} ${currency} only when you send an individual message after free allowance.`,
-      description_rw: `Ishyura ${payPerMessagePrice} ${currency} gusa ku butumwa wohereje iyo ubufasha burangiye.`,
-      description_fr: `Payez ${payPerMessagePrice} ${currency} par message envoy\xE9 hors quota gratuit.`,
+      description_en: `Pay ${payPerMessagePrice.toLocaleString()} ${currency} only when you send an individual message after free allowance.`,
+      description_rw: `Ishyura ${payPerMessagePrice.toLocaleString()} ${currency} gusa ku butumwa wohereje iyo ubufasha burangiye.`,
+      description_fr: `Payez ${payPerMessagePrice.toLocaleString()} ${currency} par message envoy\xE9 hors quota gratuit.`,
       price: payPerMessagePrice,
       currency,
       durationDays: 0,
@@ -2964,9 +3512,9 @@ async function handler20(req, res) {
       name_en: "Direct Contact Unlock",
       name_rw: "Kureba Nimero ya Telefone",
       name_fr: "D\xE9blocage Contact Direct",
-      description_en: `Unlock direct phone number when the member gives mutual consent (${contactUnlockPrice} ${currency}).`,
-      description_rw: `Reba numero ya telefone mugihe mwembi mwabyemeranyijweho (${contactUnlockPrice} ${currency}).`,
-      description_fr: `D\xE9bloquez le num\xE9ro de t\xE9l\xE9phone avec consentement mutuel (${contactUnlockPrice} ${currency}).`,
+      description_en: `Unlock direct phone number when the member gives mutual consent (${contactUnlockPrice.toLocaleString()} ${currency}).`,
+      description_rw: `Reba numero ya telefone mugihe mwembi mwabyemeranyijweho (${contactUnlockPrice.toLocaleString()} ${currency}).`,
+      description_fr: `D\xE9bloquez le num\xE9ro de t\xE9l\xE9phone avec consentement mutuel (${contactUnlockPrice.toLocaleString()} ${currency}).`,
       price: contactUnlockPrice,
       currency,
       durationDays: 0,
@@ -2977,11 +3525,26 @@ async function handler20(req, res) {
       ]
     }
   ];
-  return res.status(200).json({ success: true, plans });
+  return res.status(200).json({
+    success: true,
+    plans,
+    settings: {
+      freeInitialMessages,
+      freeReplies,
+      freeDistinctRecipients,
+      hourlyPassPrice: hourlyPrice,
+      threeDayPassPrice: threeDayPrice,
+      weeklyPassPrice: weeklyPrice,
+      payPerMessagePrice,
+      contactUnlockPrice,
+      currency
+    }
+  });
 }
 
 // api/_routes/subscriptions/subscribe.ts
 import crypto12 from "crypto";
+init_db();
 async function handler21(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -3064,6 +3627,7 @@ async function handler21(req, res) {
 }
 
 // api/_routes/notifications/index.ts
+init_db();
 async function handler22(req, res) {
   const auth = extractAuthUser(req);
   if (!auth) {
@@ -3101,8 +3665,360 @@ async function handler22(req, res) {
   return res.status(405).json({ success: false, error: "Method not allowed" });
 }
 
-// api/_routes/admin/metrics.ts
+// api/_routes/stories/index.ts
+init_db();
 async function handler23(req, res) {
+  if (req.method === "GET") {
+    const auth = extractAuthUser(req);
+    const now = (/* @__PURE__ */ new Date()).getTime();
+    const activeStories = (memoryStore.stories || []).filter((s) => {
+      const exp = s.expiresAt ? new Date(s.expiresAt).getTime() : 0;
+      return exp > now;
+    });
+    const groupedMap = /* @__PURE__ */ new Map();
+    for (const story of activeStories) {
+      if (!groupedMap.has(story.userId)) {
+        const user = memoryStore.users.find((u) => u.id === story.userId);
+        const profile = memoryStore.profiles.find((p) => p.userId === story.userId);
+        const displayName = profile?.displayName || user?.email?.split("@")[0] || "Kunda Member";
+        const avatar = profile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80";
+        const verified = Boolean(profile?.verifiedBadge);
+        groupedMap.set(story.userId, {
+          userId: story.userId,
+          displayName,
+          avatar,
+          verifiedBadge: verified,
+          isOwn: auth?.userId === story.userId,
+          stories: []
+        });
+      }
+      const group = groupedMap.get(story.userId);
+      group.stories.push({
+        ...story,
+        isLiked: Boolean(story.likedBy?.includes(auth?.userId))
+      });
+    }
+    const grouped = Array.from(groupedMap.values()).map((g) => {
+      g.stories.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      return g;
+    });
+    if (auth?.userId) {
+      grouped.sort((a, b) => a.userId === auth.userId ? -1 : b.userId === auth.userId ? 1 : 0);
+    }
+    return res.status(200).json({
+      success: true,
+      storiesGrouped: grouped,
+      totalActiveStories: activeStories.length
+    });
+  }
+  if (req.method === "POST") {
+    const auth = extractAuthUser(req);
+    if (!auth) {
+      return res.status(401).json({ success: false, error: "Unauthorized: login required to post a story" });
+    }
+    const { action, storyId, mediaUrl, mediaType, caption, duration, segmentIndex, totalSegments } = req.body || {};
+    if (action === "like") {
+      if (!storyId) {
+        return res.status(400).json({ success: false, error: "storyId is required" });
+      }
+      const story = (memoryStore.stories || []).find((s) => s.id === storyId);
+      if (!story) {
+        return res.status(404).json({ success: false, error: "Story not found or expired" });
+      }
+      story.likedBy = story.likedBy || [];
+      const hasLiked = story.likedBy.includes(auth.userId);
+      if (hasLiked) {
+        story.likedBy = story.likedBy.filter((id) => id !== auth.userId);
+        story.likesCount = Math.max(0, (story.likesCount || 1) - 1);
+      } else {
+        story.likedBy.push(auth.userId);
+        story.likesCount = (story.likesCount || 0) + 1;
+        if (story.userId !== auth.userId) {
+          const senderProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
+          const senderName = senderProfile?.displayName || "A member";
+          memoryStore.notifications.push({
+            id: "notif-" + Date.now(),
+            userId: story.userId,
+            title: "\u2764\uFE0F Story Reaction",
+            message: `${senderName} loved your story!`,
+            type: "story_like",
+            isRead: false,
+            createdAt: (/* @__PURE__ */ new Date()).toISOString()
+          });
+        }
+      }
+      return res.status(200).json({ success: true, isLiked: !hasLiked, likesCount: story.likesCount });
+    }
+    if (!mediaUrl) {
+      return res.status(400).json({ success: false, error: "mediaUrl is required for stories" });
+    }
+    const mType = mediaType === "video" ? "video" : "image";
+    let dur = typeof duration === "number" ? duration : mType === "video" ? 15 : 5;
+    if (mType === "video" && dur > 45.5) {
+      return res.status(400).json({
+        success: false,
+        error: "Video exceeds the 45-second limit. Please use the WhatsApp-style Auto-Cut tool to split into 45-second segments."
+      });
+    }
+    if (dur > 45) {
+      dur = 45;
+    }
+    const now = Date.now();
+    const expiresAt = new Date(now + 24 * 60 * 60 * 1e3).toISOString();
+    const newStory = {
+      id: "story-" + Date.now() + "-" + Math.random().toString(36).substr(2, 6),
+      userId: auth.userId,
+      mediaUrl,
+      mediaType: mType,
+      duration: dur,
+      caption: (caption || "").trim().slice(0, 300),
+      segmentIndex: typeof segmentIndex === "number" ? segmentIndex : 1,
+      totalSegments: typeof totalSegments === "number" ? totalSegments : 1,
+      likesCount: 0,
+      likedBy: [],
+      createdAt: new Date(now).toISOString(),
+      expiresAt
+    };
+    memoryStore.stories = memoryStore.stories || [];
+    memoryStore.stories.push(newStory);
+    return res.status(201).json({
+      success: true,
+      story: newStory,
+      message: "Story published successfully! It will be visible for 24 hours."
+    });
+  }
+  if (req.method === "DELETE") {
+    const auth = extractAuthUser(req);
+    if (!auth) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    const storyId = req.query?.id || req.body?.id;
+    if (!storyId) {
+      return res.status(400).json({ success: false, error: "Story ID is required" });
+    }
+    const index = (memoryStore.stories || []).findIndex((s) => s.id === storyId);
+    if (index === -1) {
+      return res.status(404).json({ success: false, error: "Story not found" });
+    }
+    const story = memoryStore.stories[index];
+    const isAdmin = isAuthorizedRole(auth.role, ["super_admin", "admin"]);
+    if (story.userId !== auth.userId && !isAdmin) {
+      return res.status(403).json({ success: false, error: "Cannot delete another user story" });
+    }
+    memoryStore.stories.splice(index, 1);
+    return res.status(200).json({ success: true, message: "Story deleted successfully" });
+  }
+  return res.status(405).json({ success: false, error: "Method not allowed" });
+}
+
+// api/_routes/posts/index.ts
+init_db();
+async function handler24(req, res) {
+  if (req.method === "GET") {
+    const auth = extractAuthUser(req);
+    const postsList = [...memoryStore.posts || []].reverse();
+    const formattedPosts = postsList.map((post) => {
+      const authorProfile = memoryStore.profiles.find((p) => p.userId === post.userId);
+      const authorUser = memoryStore.users.find((u) => u.id === post.userId);
+      const isLiked = Boolean(
+        auth?.userId && (memoryStore.postLikes || []).some(
+          (l) => l.postId === post.id && l.userId === auth.userId
+        )
+      );
+      const comments = (memoryStore.postComments || []).filter((c) => c.postId === post.id).map((c) => {
+        const commentUser = memoryStore.profiles.find((p) => p.userId === c.userId);
+        return {
+          id: c.id,
+          userId: c.userId,
+          userName: commentUser?.displayName || "Member",
+          userAvatar: commentUser?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+          content: c.content,
+          createdAt: c.createdAt
+        };
+      });
+      return {
+        id: post.id,
+        userId: post.userId,
+        caption: post.caption || "",
+        mediaUrls: post.mediaUrls || [],
+        feeling: post.feeling || null,
+        location: post.location || authorProfile?.city || "Rwanda",
+        likesCount: post.likesCount || 0,
+        commentsCount: comments.length,
+        isLiked,
+        comments,
+        createdAt: post.createdAt,
+        author: {
+          id: post.userId,
+          displayName: authorProfile?.displayName || authorUser?.email?.split("@")[0] || "Member",
+          avatar: authorProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+          verifiedBadge: Boolean(authorProfile?.verifiedBadge),
+          city: authorProfile?.city || "Kigali"
+        }
+      };
+    });
+    return res.status(200).json({
+      success: true,
+      posts: formattedPosts
+    });
+  }
+  if (req.method === "POST") {
+    const auth = extractAuthUser(req);
+    if (!auth) {
+      return res.status(401).json({ success: false, error: "Unauthorized: login required" });
+    }
+    const { action, postId, content, caption, mediaUrls, feeling, location } = req.body || {};
+    if (action === "like") {
+      if (!postId) {
+        return res.status(400).json({ success: false, error: "postId is required" });
+      }
+      memoryStore.postLikes = memoryStore.postLikes || [];
+      const post = (memoryStore.posts || []).find((p) => p.id === postId);
+      if (!post) {
+        return res.status(404).json({ success: false, error: "Post not found" });
+      }
+      const existingIndex = memoryStore.postLikes.findIndex(
+        (l) => l.postId === postId && l.userId === auth.userId
+      );
+      let isLiked = false;
+      if (existingIndex > -1) {
+        memoryStore.postLikes.splice(existingIndex, 1);
+        post.likesCount = Math.max(0, (post.likesCount || 1) - 1);
+        isLiked = false;
+      } else {
+        memoryStore.postLikes.push({
+          id: "like-" + Date.now(),
+          postId,
+          userId: auth.userId,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        post.likesCount = (post.likesCount || 0) + 1;
+        isLiked = true;
+        if (post.userId !== auth.userId) {
+          const liker = memoryStore.profiles.find((p) => p.userId === auth.userId);
+          const likerName = liker?.displayName || "Someone";
+          memoryStore.notifications = memoryStore.notifications || [];
+          memoryStore.notifications.push({
+            id: "notif-" + Date.now(),
+            userId: post.userId,
+            title: "\u2764\uFE0F Post Liked",
+            message: `${likerName} liked your post.`,
+            type: "post_like",
+            isRead: false,
+            createdAt: (/* @__PURE__ */ new Date()).toISOString()
+          });
+        }
+      }
+      return res.status(200).json({
+        success: true,
+        isLiked,
+        likesCount: post.likesCount
+      });
+    }
+    if (action === "comment") {
+      if (!postId || !content?.trim()) {
+        return res.status(400).json({ success: false, error: "postId and content are required" });
+      }
+      const post = (memoryStore.posts || []).find((p) => p.id === postId);
+      if (!post) {
+        return res.status(404).json({ success: false, error: "Post not found" });
+      }
+      const commenter = memoryStore.profiles.find((p) => p.userId === auth.userId);
+      const commenterName = commenter?.displayName || "Member";
+      const commenterAvatar = commenter?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80";
+      const newComment = {
+        id: "c-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
+        postId,
+        userId: auth.userId,
+        userName: commenterName,
+        userAvatar: commenterAvatar,
+        content: content.trim().slice(0, 500),
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      memoryStore.postComments = memoryStore.postComments || [];
+      memoryStore.postComments.push(newComment);
+      post.commentsCount = (post.commentsCount || 0) + 1;
+      if (post.userId !== auth.userId) {
+        memoryStore.notifications = memoryStore.notifications || [];
+        memoryStore.notifications.push({
+          id: "notif-" + Date.now(),
+          userId: post.userId,
+          title: "\u{1F4AC} New Comment",
+          message: `${commenterName} commented on your post: "${newComment.content.slice(0, 60)}"`,
+          type: "post_comment",
+          isRead: false,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }
+      return res.status(201).json({
+        success: true,
+        comment: newComment,
+        commentsCount: post.commentsCount
+      });
+    }
+    if (!caption?.trim() && (!mediaUrls || mediaUrls.length === 0)) {
+      return res.status(400).json({ success: false, error: "Post requires either a caption or at least one photo/video." });
+    }
+    const newPost = {
+      id: "post-" + Date.now() + "-" + Math.random().toString(36).substr(2, 6),
+      userId: auth.userId,
+      caption: (caption || "").trim().slice(0, 2e3),
+      mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
+      feeling: (feeling || "").trim().slice(0, 50) || null,
+      location: (location || "").trim().slice(0, 100) || null,
+      likesCount: 0,
+      commentsCount: 0,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    memoryStore.posts = memoryStore.posts || [];
+    memoryStore.posts.push(newPost);
+    const authorProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
+    return res.status(201).json({
+      success: true,
+      post: {
+        ...newPost,
+        isLiked: false,
+        comments: [],
+        author: {
+          id: auth.userId,
+          displayName: authorProfile?.displayName || "Member",
+          avatar: authorProfile?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+          verifiedBadge: Boolean(authorProfile?.verifiedBadge),
+          city: authorProfile?.city || "Rwanda"
+        }
+      },
+      message: "Post shared to community feed successfully!"
+    });
+  }
+  if (req.method === "DELETE") {
+    const auth = extractAuthUser(req);
+    if (!auth) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    const postId = req.query?.id || req.body?.id;
+    if (!postId) {
+      return res.status(400).json({ success: false, error: "Post ID is required" });
+    }
+    const postIndex = (memoryStore.posts || []).findIndex((p) => p.id === postId);
+    if (postIndex === -1) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+    const post = memoryStore.posts[postIndex];
+    const isAdmin = isAuthorizedRole(auth.role, ["super_admin", "admin"]);
+    if (post.userId !== auth.userId && !isAdmin) {
+      return res.status(403).json({ success: false, error: "Cannot delete another user post" });
+    }
+    memoryStore.posts.splice(postIndex, 1);
+    memoryStore.postComments = (memoryStore.postComments || []).filter((c) => c.postId !== postId);
+    memoryStore.postLikes = (memoryStore.postLikes || []).filter((l) => l.postId !== postId);
+    return res.status(200).json({ success: true, message: "Post deleted successfully" });
+  }
+  return res.status(405).json({ success: false, error: "Method not allowed" });
+}
+
+// api/_routes/admin/metrics.ts
+init_db();
+async function handler25(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin", "moderator"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -3148,7 +4064,8 @@ async function handler23(req, res) {
 }
 
 // api/_routes/admin/users.ts
-async function handler24(req, res) {
+init_db();
+async function handler26(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin", "moderator"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -3249,12 +4166,29 @@ async function handler24(req, res) {
 }
 
 // api/_routes/admin/settings.ts
-async function handler25(req, res) {
+init_db();
+async function handler27(req, res) {
+  await loadAdminSettingsFromDb();
+  if (req.method === "GET" && req.query?.public === "true") {
+    return res.status(200).json({
+      success: true,
+      settings: {
+        freeInitialMessages: Number(memoryStore.adminSettings.get("free_initial_messages") ?? BUSINESS_CONFIG.FREE_INITIAL_MESSAGES),
+        freeDistinctRecipients: Number(memoryStore.adminSettings.get("free_distinct_recipients") ?? BUSINESS_CONFIG.FREE_DISTINCT_RECIPIENTS),
+        freeReplies: Number(memoryStore.adminSettings.get("free_replies") ?? BUSINESS_CONFIG.FREE_REPLIES_ALLOWED),
+        hourlyPassPrice: Number(memoryStore.adminSettings.get("hourly_pass_cost") ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF),
+        threeDayPassPrice: Number(memoryStore.adminSettings.get("three_day_pass_cost") ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF),
+        weeklyPassPrice: Number(memoryStore.adminSettings.get("weekly_pass_cost") ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF),
+        payPerMessagePrice: Number(memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF),
+        contactUnlockPrice: Number(memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF),
+        defaultCurrency: memoryStore.adminSettings.get("default_currency") || BUSINESS_CONFIG.DEFAULT_CURRENCY
+      }
+    });
+  }
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
   }
-  await loadAdminSettingsFromDb();
   if (req.method === "GET") {
     const currentSettings = {
       // Free Allowances
@@ -3294,13 +4228,21 @@ async function handler25(req, res) {
     }
     const savePromises = [];
     if (updates.freeInitialMessages !== void 0) {
-      savePromises.push(saveAdminSettingToDb("free_initial_messages", parseInt(updates.freeInitialMessages, 10)));
+      const val = parseInt(updates.freeInitialMessages, 10);
+      savePromises.push(saveAdminSettingToDb("free_initial_messages", val));
+      for (const [, al] of memoryStore.allowances.entries()) {
+        al.initialRemaining = Math.max(0, val - (al.distinctRecipients?.length || 0));
+      }
     }
     if (updates.freeDistinctRecipients !== void 0) {
       savePromises.push(saveAdminSettingToDb("free_distinct_recipients", parseInt(updates.freeDistinctRecipients, 10)));
     }
     if (updates.freeReplies !== void 0) {
-      savePromises.push(saveAdminSettingToDb("free_replies", parseInt(updates.freeReplies, 10)));
+      const val = parseInt(updates.freeReplies, 10);
+      savePromises.push(saveAdminSettingToDb("free_replies", val));
+      for (const [, al] of memoryStore.allowances.entries()) {
+        al.repliesRemaining = val;
+      }
     }
     if (updates.hourlyPassPrice !== void 0) {
       savePromises.push(saveAdminSettingToDb("hourly_pass_cost", parseInt(updates.hourlyPassPrice, 10)));
@@ -3343,7 +4285,8 @@ async function handler25(req, res) {
 }
 
 // api/_routes/admin/moderation.ts
-async function handler26(req, res) {
+init_db();
+async function handler28(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin", "moderator"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -3365,7 +4308,8 @@ async function handler26(req, res) {
 }
 
 // api/_routes/admin/ledger.ts
-async function handler27(req, res) {
+init_db();
+async function handler29(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -3398,6 +4342,70 @@ async function handler27(req, res) {
   return res.status(405).json({ success: false, error: "Method not allowed" });
 }
 
+// api/_routes/admin/backup.ts
+import fs2 from "fs";
+import path2 from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
+var __filename2 = fileURLToPath2(import.meta.url);
+var __dirname2 = path2.dirname(__filename2);
+var runDatabaseBackup2 = null;
+try {
+  const backupModule = await Promise.resolve().then(() => (init_backup_db(), backup_db_exports)).catch(() => null);
+  if (backupModule) runDatabaseBackup2 = backupModule.runDatabaseBackup;
+} catch (e) {
+}
+async function handler30(req, res) {
+  const auth = extractAuthUser(req);
+  if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin"])) {
+    return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
+  }
+  const backupsDir = path2.resolve(__dirname2, "../../../backups");
+  const metaFile = path2.join(backupsDir, ".last_backup_meta.json");
+  if (req.method === "GET") {
+    let lastMeta = null;
+    if (fs2.existsSync(metaFile)) {
+      try {
+        lastMeta = JSON.parse(fs2.readFileSync(metaFile, "utf8"));
+      } catch (e) {
+        lastMeta = null;
+      }
+    }
+    let backupFiles = [];
+    if (fs2.existsSync(backupsDir)) {
+      const files = fs2.readdirSync(backupsDir);
+      backupFiles = files.filter((f) => f.endsWith(".sql")).map((f) => {
+        const stat = fs2.statSync(path2.join(backupsDir, f));
+        return {
+          filename: f,
+          sizeBytes: stat.size,
+          sizeFormatted: `${(stat.size / 1024).toFixed(1)} KB`,
+          createdAt: stat.birthtime.toISOString()
+        };
+      }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+    return res.status(200).json({
+      success: true,
+      lastBackup: lastMeta,
+      historyCount: backupFiles.length,
+      history: backupFiles
+    });
+  }
+  if (req.method === "POST") {
+    const { force } = req.body || {};
+    try {
+      const result = await runDatabaseBackup2({ force: Boolean(force) });
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error("Manual backup trigger error:", err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || "Failed to generate database backup"
+      });
+    }
+  }
+  return res.status(405).json({ success: false, error: "Method not allowed" });
+}
+
 // api/_index.ts
 var routes = {
   "auth/login": handler2,
@@ -3422,13 +4430,21 @@ var routes = {
   "subscriptions/plans": handler20,
   "subscriptions/subscribe": handler21,
   "notifications": handler22,
-  "admin/metrics": handler23,
-  "admin/users": handler24,
-  "admin/settings": handler25,
-  "admin/moderation": handler26,
-  "admin/ledger": handler27
+  "stories": handler23,
+  "posts": handler24,
+  "settings/public": (req, res) => {
+    req.query = req.query || {};
+    req.query.public = "true";
+    return handler27(req, res);
+  },
+  "admin/metrics": handler25,
+  "admin/users": handler26,
+  "admin/settings": handler27,
+  "admin/moderation": handler28,
+  "admin/ledger": handler29,
+  "admin/backup": handler30
 };
-async function handler28(req, res) {
+async function handler31(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -3498,5 +4514,5 @@ async function handler28(req, res) {
   }
 }
 export {
-  handler28 as default
+  handler31 as default
 };

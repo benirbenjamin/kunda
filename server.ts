@@ -28,6 +28,8 @@ import verifyPaymentHandler from './api/_routes/payments/verify.js';
 import plansHandler from './api/_routes/subscriptions/plans.js';
 import subscribeHandler from './api/_routes/subscriptions/subscribe.js';
 import notificationsHandler from './api/_routes/notifications/index.js';
+import storiesHandler from './api/_routes/stories/index.js';
+import postsHandler from './api/_routes/posts/index.js';
 import adminMetricsHandler from './api/_routes/admin/metrics.js';
 import adminUsersHandler from './api/_routes/admin/users.js';
 import adminSettingsHandler from './api/_routes/admin/settings.js';
@@ -102,6 +104,10 @@ bindRoute('/api/subscriptions/subscribe', subscribeHandler);
 
 // Notifications
 bindRoute('/api/notifications', notificationsHandler);
+
+// Stories & Posts
+bindRoute('/api/stories', storiesHandler);
+bindRoute('/api/posts', postsHandler);
 
 // Admin routes
 bindRoute('/api/admin/metrics', adminMetricsHandler);

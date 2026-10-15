@@ -2,7 +2,8 @@
 // GET /api/auth/me - Authenticated session state
 // =====================================================================
 import { extractAuthUser } from '../../_lib/auth.js';
-import { memoryStore } from '../../_lib/db.js';
+import { memoryStore, loadAdminSettingsFromDb } from '../../_lib/db.js';
+import { BUSINESS_CONFIG } from '../../_lib/config.js';
 import { getWalletBalance } from '../../_lib/wallet.js';
 
 export default async function handler(req: any, res: any) {

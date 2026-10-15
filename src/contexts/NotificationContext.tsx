@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { api } from '../lib/api';
 import { MessageCircle, Heart, X, Bell, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { registerServiceWorker, setAppBadge, showSystemNotification } from '../lib/pwa';
 
 export interface NotificationItem {
   id: string;
@@ -129,32 +130,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   /**
-   * Dispatches both Native HTML5 Push Notification and In-App Push Toast
+   * Dispatches both Native OS System Tray Push Notification (Phone/PC) and In-App Push Toast
    */
   const triggerPushAlert = (item: NotificationItem) => {
     // 1. Play sound chime
     playNotificationSound();
 
-    // 2. Native Browser Push Notification
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      try {
-        const push = new Notification(item.title, {
-          body: item.body,
-          icon: '/favicon.ico',
-          badge: '/favicon.ico',
-          tag: item.id,
-        });
-
-        push.onclick = () => {
-          window.focus();
-          if (item.linkUrl) {
-            window.location.href = item.linkUrl;
-          }
-        };
-      } catch (e) {
-        console.warn('Native push error:', e);
-      }
-    }
+    // 2. Native OS System Notification (Phone Tray & PC Action Center)
+    showSystemNotification(item.title, {
+      body: item.body,
+      icon: '/logo.svg',
+      badge: '/logo.svg',
+      url: item.linkUrl || '/dashboard/messages',
+      tag: item.id,
+    });
 
     // 3. In-App Floating Push Toast
     setActivePushToast({
@@ -238,7 +227,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  // Register PWA Service Worker on app launch
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // Sync PWA App Badge on Phone home screen & PC taskbar
+  useEffect(() => {
+    setAppBadge(unreadCount);
+  }, [unreadCount]);
 
   return (
     <NotificationContext.Provider

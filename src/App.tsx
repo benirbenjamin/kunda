@@ -26,12 +26,14 @@ import { ResetPassword } from './pages/auth/ResetPassword';
 
 // Dashboard Pages
 import { Discover } from './pages/dashboard/Discover';
+import { Feed } from './pages/dashboard/Feed';
 import { Matches } from './pages/dashboard/Matches';
 import { Messages } from './pages/dashboard/Messages';
 import { Wallet } from './pages/dashboard/Wallet';
 import { Subscription } from './pages/dashboard/Subscription';
 import { Profile } from './pages/dashboard/Profile';
 import { Settings } from './pages/dashboard/Settings';
+import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
 
 // Admin Page
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -126,6 +128,14 @@ export const AppContent: React.FC = () => {
             }
           />
           <Route
+            path="/dashboard/feed"
+            element={
+              <ProtectedRoute>
+                <Feed />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/dashboard/matches"
             element={
               <ProtectedRoute>
@@ -191,6 +201,7 @@ export const AppContent: React.FC = () => {
       </main>
       <Footer />
       <BottomNav />
+      <PwaInstallPrompt />
     </div>
   );
 };

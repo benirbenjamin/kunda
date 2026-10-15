@@ -6,11 +6,6 @@ import { memoryStore, loadAdminSettingsFromDb, saveAdminSettingToDb } from '../.
 import { BUSINESS_CONFIG } from '../../_lib/config.js';
 
 export default async function handler(req: any, res: any) {
-  const auth = extractAuthUser(req);
-  if (!auth || !isAuthorizedRole(auth.role, ['super_admin', 'admin'])) {
-    return res.status(403).json({ success: false, error: 'Forbidden: Admin access required.' });
-  }
-
   // Ensure settings are synced from DB
   await loadAdminSettingsFromDb();
 

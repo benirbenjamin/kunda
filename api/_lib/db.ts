@@ -91,6 +91,10 @@ export const memoryStore = {
   reports: [] as any[],
   adminSettings: new Map<string, any>(),
   tutorials: [] as any[],
+  stories: [] as any[],
+  posts: [] as any[],
+  postComments: [] as any[],
+  postLikes: [] as any[],
 };
 
 // Seed initial memory store with admin and realistic member profiles
@@ -390,6 +394,100 @@ function initMemoryStore() {
     memoryStore.wallets.set(m.id, { balanceMinor: 5000, currency: 'RWF' });
     memoryStore.allowances.set(m.id, { initialRemaining: 3, distinctRecipients: [], repliesRemaining: 3 });
   }
+
+  // Pre-seed 24h stories for active community members
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  memoryStore.stories.push(
+    {
+      id: 'story-seed-1',
+      userId: 'm1000000-0000-0000-0000-000000000001',
+      mediaUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+      mediaType: 'image',
+      duration: 5,
+      caption: 'Sunset view over Kigali hills 🌄 Happy weekend!',
+      likesCount: 12,
+      createdAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(now + 22 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'story-seed-2',
+      userId: 'm2000000-0000-0000-0000-000000000002',
+      mediaUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
+      mediaType: 'image',
+      duration: 5,
+      caption: 'Morning 10km run on Mount Kigali 🏃‍♂️ Specialty coffee next?',
+      likesCount: 9,
+      createdAt: new Date(now - 4 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(now + 20 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'story-seed-3',
+      userId: 'm3000000-0000-0000-0000-000000000003',
+      mediaUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80',
+      mediaType: 'image',
+      duration: 5,
+      caption: 'Contemporary art exhibition in Kiyovu ✨ Inspiring creators.',
+      likesCount: 18,
+      createdAt: new Date(now - 1 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(now + 23 * 60 * 60 * 1000).toISOString(),
+    }
+  );
+
+  // Pre-seed Community Feed Posts
+  memoryStore.posts.push(
+    {
+      id: 'post-seed-1',
+      userId: 'm1000000-0000-0000-0000-000000000001',
+      caption: 'Looking for recommendations for the best quiet coffee spots in Kimihurura or Kiyovu! Where is your favorite weekend reading haven? ☕️🇷🇼',
+      mediaUrls: ['https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80'],
+      feeling: 'curious 💭',
+      location: 'Kimihurura, Kigali',
+      likesCount: 19,
+      commentsCount: 3,
+      createdAt: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'post-seed-2',
+      userId: 'm2000000-0000-0000-0000-000000000002',
+      caption: 'Summit reached! Nothing beats starting your weekend early in our country of a thousand hills. Fresh air, great trails, and clarity of mind. 🥾⛰️',
+      mediaUrls: ['https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80'],
+      feeling: 'energized ⚡️',
+      location: 'Mount Kigali, Rwanda',
+      likesCount: 34,
+      commentsCount: 5,
+      createdAt: new Date(now - 7 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'post-seed-3',
+      userId: 'm3000000-0000-0000-0000-000000000003',
+      caption: 'Celebrating authentic Rwandan fashion and modern elegance. Proud of our local designers pushing boundaries globally! ✨🇷🇼',
+      mediaUrls: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80'],
+      feeling: 'inspired 🌟',
+      location: 'Kigali Cultural Village',
+      likesCount: 42,
+      commentsCount: 8,
+      createdAt: new Date(now - 12 * 60 * 60 * 1000).toISOString(),
+    }
+  );
+
+  // Pre-seed some comments
+  memoryStore.postComments.push(
+    {
+      id: 'c-1',
+      postId: 'post-seed-1',
+      userId: 'm2000000-0000-0000-0000-000000000002',
+      content: 'Inzora Rooftop Cafe or Question Coffee! Both have great atmosphere and views.',
+      createdAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'c-2',
+      postId: 'post-seed-2',
+      userId: 'm1000000-0000-0000-0000-000000000001',
+      content: 'Count me in next time! Which trail did you take up?',
+      createdAt: new Date(now - 5 * 60 * 60 * 1000).toISOString(),
+    }
+  );
 }
 
 initMemoryStore();

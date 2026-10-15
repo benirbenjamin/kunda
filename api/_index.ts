@@ -23,6 +23,8 @@ import verifyPaymentHandler from './_routes/payments/verify.js';
 import plansHandler from './_routes/subscriptions/plans.js';
 import subscribeHandler from './_routes/subscriptions/subscribe.js';
 import notificationsHandler from './_routes/notifications/index.js';
+import storiesHandler from './_routes/stories/index.js';
+import postsHandler from './_routes/posts/index.js';
 import adminMetricsHandler from './_routes/admin/metrics.js';
 import adminUsersHandler from './_routes/admin/users.js';
 import adminSettingsHandler from './_routes/admin/settings.js';
@@ -53,6 +55,8 @@ const routes: Record<string, (req: any, res: any) => Promise<any> | any> = {
   'subscriptions/plans': plansHandler,
   'subscriptions/subscribe': subscribeHandler,
   'notifications': notificationsHandler,
+  'stories': storiesHandler,
+  'posts': postsHandler,
   'settings/public': (req: any, res: any) => {
     req.query = req.query || {};
     req.query.public = 'true';
