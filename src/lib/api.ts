@@ -6,7 +6,7 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 20000,
+  timeout: 45000,
 });
 
 // Automatically inject JWT token from localStorage if present

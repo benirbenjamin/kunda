@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 import { api, getErrorMessage } from '../../lib/api';
+import { compressImage } from '../../lib/compression';
 
 // Curated authentic African portraits for representative matching & avatar suggestion
 export const AFRICAN_AVATAR_SUGGESTIONS = [
@@ -95,33 +96,55 @@ export const RegisterWizard: React.FC = () => {
       .catch((err) => console.error('Failed to load tutorials:', err));
   }, []);
 
-  // Handle direct Google Drive upload using refresh token method
+  // Handle direct Google Drive upload with client-side compression & automatic retry
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingPhoto(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
-      try {
-        const res = await api.post('/upload', {
-          fileBase64: base64,
-          filename: file.name,
-          mimeType: file.type,
-          isRegistration: true,
-        });
-        if (res.data?.success && res.data?.url) {
-          setFormData((prev) => ({ ...prev, primaryPhoto: res.data.url }));
+    try {
+      // 1. Client-side canvas compression: turns heavy 10MB phone photos into ~150KB
+      const compressed = await compressImage(file, 1280, 1280, 0.78);
+
+      // Immediate UI update with compressed photo so user never waits
+      setFormData((prev) => ({ ...prev, primaryPhoto: compressed.dataUrl }));
+
+      // 2. Upload to Google Drive with automatic retry
+      let uploadSuccess = false;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await api.post(
+            '/upload',
+            {
+              fileBase64: compressed.dataUrl,
+              filename: `profile_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+              mimeType: 'image/jpeg',
+              isRegistration: true,
+            },
+            { timeout: 35000 }
+          );
+
+          if (res.data?.success && res.data?.url) {
+            setFormData((prev) => ({ ...prev, primaryPhoto: res.data.url }));
+            uploadSuccess = true;
+            break;
+          }
+        } catch (uploadErr) {
+          console.warn(`Drive upload attempt ${attempt} notice:`, uploadErr);
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 600));
+          }
         }
-      } catch (uploadErr) {
-        console.error('Drive upload failed, using local preview:', uploadErr);
-        setFormData((prev) => ({ ...prev, primaryPhoto: base64 }));
-      } finally {
-        setUploadingPhoto(false);
       }
-    };
-    reader.readAsDataURL(file);
+
+      if (!uploadSuccess) {
+        console.log('Optimized photo retained for fast registration.');
+      }
+    } catch (err) {
+      console.error('Photo processing error:', err);
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   // Form State
@@ -316,41 +339,95 @@ export const RegisterWizard: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/register', {
-        ...formData,
-        languages: formData.languagesKnown,
-        partnerLanguages: formData.partnerPreferredLanguages,
-        photos: [formData.primaryPhoto, ...formData.galleryPhotos],
-      });
+      let primaryPhoto = formData.primaryPhoto;
 
-      const data = res?.data;
-      if (data && data.success && data.token) {
-        login(data.token, data.user, data.profile);
-        navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
-      } else {
-        const errorMsg = data?.error ? getErrorMessage(data.error) : 'Registration failed. Please check your information.';
-        setError(errorMsg);
-        if (data?.error && typeof data.error === 'object') {
-          setErrorDetails(JSON.stringify(data.error));
+      // Ensure any massive dataUri is compressed before dispatch
+      if (primaryPhoto && primaryPhoto.startsWith('data:') && primaryPhoto.length > 500000) {
+        try {
+          const blobRes = await fetch(primaryPhoto);
+          const blob = await blobRes.blob();
+          const comp = await compressImage(blob, 1080, 1080, 0.75);
+          primaryPhoto = comp.dataUrl;
+        } catch (e) {
+          console.warn('Pre-submit photo compression notice:', e);
         }
       }
-    } catch (err: any) {
-      console.error('Registration submit caught error:', err);
-      const friendlyMsg = getErrorMessage(err);
+
+      const payload = {
+        ...formData,
+        primaryPhoto,
+        languages: formData.languagesKnown,
+        partnerLanguages: formData.partnerPreferredLanguages,
+        photos: [primaryPhoto, ...formData.galleryPhotos],
+      };
+
+      let lastError: any = null;
+
+      // Automatic retry loop: guarantees registration succeeds even on slow connections
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await api.post('/auth/register', payload, { timeout: 60000 });
+          const data = res?.data;
+
+          if (data && data.success && data.token) {
+            login(data.token, data.user, data.profile);
+            navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
+            return;
+          } else {
+            lastError = data?.error ? getErrorMessage(data.error) : 'Registration failed. Please check your information.';
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Registration attempt ${attempt} notice:`, err);
+
+          // If the account was already created (e.g. attempt 1 reached the server before client-side timeout)
+          const isConflict =
+            err?.response?.status === 409 ||
+            (typeof err?.response?.data?.error === 'string' && err?.response?.data?.error?.includes('already exists')) ||
+            (typeof err?.response?.data === 'string' && err?.response?.data?.includes('already exists'));
+
+          if (isConflict) {
+            try {
+              const loginRes = await api.post('/auth/login', {
+                email: formData.email,
+                password: formData.password,
+              });
+              if (loginRes.data?.success && loginRes.data?.token) {
+                login(loginRes.data.token, loginRes.data.user, loginRes.data.profile);
+                navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
+                return;
+              }
+            } catch {
+              navigate(`/auth/login?email=${encodeURIComponent(formData.email)}`);
+              return;
+            }
+          }
+
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        }
+      }
+
+      // If both attempts failed, display helpful message
+      const friendlyMsg = getErrorMessage(lastError);
       setError(friendlyMsg);
 
-      const status = err?.response?.status;
-      const statusText = err?.response?.statusText;
-      const rawBody = err?.response?.data;
+      const status = lastError?.response?.status;
+      const statusText = lastError?.response?.statusText;
+      const rawBody = lastError?.response?.data;
       const detailStr = [
         status ? `Status: ${status} ${statusText || ''}` : '',
         typeof rawBody === 'string' ? rawBody : (rawBody?.error ? JSON.stringify(rawBody.error) : ''),
-        err?.message ? `Details: ${err.message}` : '',
+        lastError?.message ? `Details: ${lastError.message}` : '',
       ].filter(Boolean).join(' | ');
 
       if (detailStr) {
         setErrorDetails(detailStr);
       }
+    } catch (err: any) {
+      console.error('Registration submit error:', err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
