@@ -67,11 +67,16 @@ function initMemoryStore() {
   memoryStore.adminSettings.set("free_initial_messages", 3);
   memoryStore.adminSettings.set("free_distinct_recipients", 3);
   memoryStore.adminSettings.set("free_replies", 3);
-  memoryStore.adminSettings.set("hourly_pass_cost", 500);
-  memoryStore.adminSettings.set("three_day_pass_cost", 1500);
-  memoryStore.adminSettings.set("weekly_pass_cost", 3e3);
+  memoryStore.adminSettings.set("hourly_pass_cost", 1500);
+  memoryStore.adminSettings.set("three_day_pass_cost", 3e3);
+  memoryStore.adminSettings.set("weekly_pass_cost", 5e3);
   memoryStore.adminSettings.set("pay_per_message_cost", 150);
   memoryStore.adminSettings.set("contact_unlock_cost", 2e3);
+  memoryStore.adminSettings.set("welcome_bonus_amount", 500);
+  memoryStore.adminSettings.set("referral_signup_reward", 200);
+  memoryStore.adminSettings.set("referral_deposit_commission_pct", 5);
+  memoryStore.adminSettings.set("contact_unlock_commission_pct", 15);
+  memoryStore.adminSettings.set("minimum_withdrawal_amount", 2e3);
   memoryStore.adminSettings.set("default_currency", "RWF");
   memoryStore.adminSettings.set("email_provider", "mock");
   memoryStore.adminSettings.set("resend_api_key", "");
@@ -608,7 +613,8 @@ var init_db = __esm({
       stories: [],
       posts: [],
       postComments: [],
-      postLikes: []
+      postLikes: [],
+      withdrawals: []
     };
     initMemoryStore();
     settingsTableInitialized = false;
@@ -1048,7 +1054,7 @@ var init_backup_db = __esm({
 });
 
 // api/_routes/auth/register.ts
-import crypto from "crypto";
+import crypto2 from "crypto";
 
 // api/_lib/auth.ts
 import bcrypt from "bcryptjs";
@@ -1061,11 +1067,23 @@ var BUSINESS_CONFIG = {
   FREE_DISTINCT_RECIPIENTS: 3,
   FREE_REPLIES_ALLOWED: 3,
   // Costs (in minor units: 1 RWF = 1 unit or cents)
-  HOURLY_PASS_PRICE_RWF: 500,
-  THREE_DAY_PASS_PRICE_RWF: 1500,
-  WEEKLY_PASS_PRICE_RWF: 3e3,
+  HOURLY_PASS_PRICE_RWF: 1500,
+  // 24-Hour Pass (Daily)
+  THREE_DAY_PASS_PRICE_RWF: 3e3,
+  WEEKLY_PASS_PRICE_RWF: 5e3,
   PAY_PER_MESSAGE_PRICE_RWF: 150,
   CONTACT_UNLOCK_PRICE_RWF: 2e3,
+  // Earning & Affiliate Rewards
+  WELCOME_BONUS_RWF: 500,
+  // Credited to welcome bonus wallet on signup (spendable, non-withdrawable)
+  REFERRAL_SIGNUP_REWARD_RWF: 200,
+  // Credited to withdrawable balance when referred friend registers
+  REFERRAL_DEPOSIT_COMMISSION_PCT: 5,
+  // 5% of all deposits made by referred users
+  CONTACT_UNLOCK_COMMISSION_PCT: 15,
+  // 15% revenue share when contact is unlocked
+  MINIMUM_WITHDRAWAL_RWF: 2e3,
+  // Minimum threshold to withdraw to MoMo / Airtel / Bank
   DEFAULT_CURRENCY: "RWF",
   // Algorithm weights (0-100)
   MATCHING_WEIGHTS: {
@@ -1319,6 +1337,288 @@ async function sendPasswordResetEmail(toEmail, displayName, resetCode, resetToke
   });
 }
 
+// api/_lib/wallet.ts
+init_db();
+import crypto from "crypto";
+async function getWalletBalance(userId) {
+  const existing = memoryStore.wallets.get(userId);
+  if (existing) {
+    return {
+      userId,
+      balanceMinor: existing.balanceMinor || 0,
+      bonusBalanceMinor: existing.bonusBalanceMinor || 0,
+      withdrawableEarnedMinor: existing.withdrawableEarnedMinor || 0,
+      currency: existing.currency || "RWF",
+      savedPayoutMethod: existing.savedPayoutMethod,
+      savedPayoutAccount: existing.savedPayoutAccount,
+      savedPayoutAccountName: existing.savedPayoutAccountName,
+      savedBankName: existing.savedBankName
+    };
+  }
+  const initial = {
+    userId,
+    balanceMinor: 0,
+    bonusBalanceMinor: 0,
+    withdrawableEarnedMinor: 0,
+    currency: "RWF"
+  };
+  memoryStore.wallets.set(userId, initial);
+  return initial;
+}
+async function creditWelcomeBonus(userId, amountMinor) {
+  if (amountMinor <= 0) return;
+  const wallet = await getWalletBalance(userId);
+  wallet.bonusBalanceMinor = (wallet.bonusBalanceMinor || 0) + amountMinor;
+  memoryStore.wallets.set(userId, wallet);
+  const txRecord = {
+    id: crypto.randomUUID(),
+    walletId: `w-${userId}`,
+    userId,
+    amountMinor,
+    currency: wallet.currency,
+    type: "welcome_bonus",
+    description: `\u{1F381} Welcome Bonus credited! (${amountMinor} RWF spendable on messaging, passes & contact unlocks)`,
+    reference: `WB_${Date.now()}_${userId.slice(0, 6)}`,
+    status: "completed",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.transactions.unshift(txRecord);
+}
+async function creditReferralReward(referrerId, amountMinor, referredUserName) {
+  if (amountMinor <= 0) return;
+  const wallet = await getWalletBalance(referrerId);
+  wallet.balanceMinor = (wallet.balanceMinor || 0) + amountMinor;
+  wallet.withdrawableEarnedMinor = (wallet.withdrawableEarnedMinor || 0) + amountMinor;
+  memoryStore.wallets.set(referrerId, wallet);
+  const txRecord = {
+    id: crypto.randomUUID(),
+    walletId: `w-${referrerId}`,
+    userId: referrerId,
+    amountMinor,
+    currency: wallet.currency,
+    type: "referral_signup_reward",
+    description: `\u{1F91D} Referral Reward: ${referredUserName} joined using your invite link! (+${amountMinor} RWF withdrawable)`,
+    reference: `REF_SIGNUP_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+    status: "completed",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.transactions.unshift(txRecord);
+  memoryStore.notifications.push({
+    id: "notif-" + Date.now(),
+    userId: referrerId,
+    title: "\u{1F389} Referral Bonus Earned!",
+    message: `${referredUserName} registered with your link. You received ${amountMinor} RWF in your withdrawable wallet!`,
+    type: "referral_reward",
+    isRead: false,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+async function creditDepositCommission(referrerId, depositAmountMinor, commissionPct = 5) {
+  const commAmount = Math.round(depositAmountMinor * (commissionPct / 100));
+  if (commAmount <= 0) return;
+  const wallet = await getWalletBalance(referrerId);
+  wallet.balanceMinor = (wallet.balanceMinor || 0) + commAmount;
+  wallet.withdrawableEarnedMinor = (wallet.withdrawableEarnedMinor || 0) + commAmount;
+  memoryStore.wallets.set(referrerId, wallet);
+  const txRecord = {
+    id: crypto.randomUUID(),
+    walletId: `w-${referrerId}`,
+    userId: referrerId,
+    amountMinor: commAmount,
+    currency: wallet.currency,
+    type: "referral_deposit_commission",
+    description: `\u{1F4B0} Referral Deposit Commission: 5% earned on ${depositAmountMinor} RWF referral deposit (+${commAmount} RWF withdrawable)`,
+    reference: `REF_DEP_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+    status: "completed",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.transactions.unshift(txRecord);
+  memoryStore.notifications.push({
+    id: "notif-" + Date.now(),
+    userId: referrerId,
+    title: "\u{1F4B0} Deposit Commission Received!",
+    message: `A member you invited deposited money. You earned ${commAmount} RWF (5% commission) ready to withdraw!`,
+    type: "referral_commission",
+    isRead: false,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+async function creditUnlockCommission(partnerId, unlockAmountMinor, commissionPct = 15) {
+  const commAmount = Math.round(unlockAmountMinor * (commissionPct / 100));
+  if (commAmount <= 0) return;
+  const wallet = await getWalletBalance(partnerId);
+  wallet.balanceMinor = (wallet.balanceMinor || 0) + commAmount;
+  wallet.withdrawableEarnedMinor = (wallet.withdrawableEarnedMinor || 0) + commAmount;
+  memoryStore.wallets.set(partnerId, wallet);
+  const txRecord = {
+    id: crypto.randomUUID(),
+    walletId: `w-${partnerId}`,
+    userId: partnerId,
+    amountMinor: commAmount,
+    currency: wallet.currency,
+    type: "contact_unlock_commission",
+    description: `\u{1F48E} Contact Unlock Revenue Share: 15% from ${unlockAmountMinor} RWF contact unlock (+${commAmount} RWF withdrawable)`,
+    reference: `UNL_COMM_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+    status: "completed",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.transactions.unshift(txRecord);
+  memoryStore.notifications.push({
+    id: "notif-" + Date.now(),
+    userId: partnerId,
+    title: "\u{1F48E} Contact Unlock Share!",
+    message: `A member unlocked your contact! You received ${commAmount} RWF (15% share) in your withdrawable wallet!`,
+    type: "unlock_commission",
+    isRead: false,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+async function creditWallet(userId, amountMinor, type, description, reference, idempotencyKey) {
+  if (amountMinor <= 0) {
+    return { success: false, newBalance: 0, error: "Credit amount must be greater than zero" };
+  }
+  const txRef = reference || `TX_CR_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+  const idemp = idempotencyKey || txRef;
+  const existing = memoryStore.transactions.find((t) => t.idempotencyKey === idemp || t.reference === txRef);
+  if (existing) {
+    const current2 = await getWalletBalance(userId);
+    return { success: true, newBalance: current2.balanceMinor };
+  }
+  const current = await getWalletBalance(userId);
+  current.balanceMinor += amountMinor;
+  memoryStore.wallets.set(userId, current);
+  const txRecord = {
+    id: crypto.randomUUID(),
+    walletId: `w-${userId}`,
+    userId,
+    amountMinor,
+    currency: current.currency,
+    type,
+    description,
+    reference: txRef,
+    idempotencyKey: idemp,
+    status: "completed",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.transactions.unshift(txRecord);
+  return { success: true, newBalance: current.balanceMinor };
+}
+async function debitWallet(userId, amountMinor, type, description, reference, idempotencyKey) {
+  if (amountMinor <= 0) {
+    return { success: false, newBalance: 0, bonusDeducted: 0, realDeducted: 0, error: "Debit amount must be greater than zero" };
+  }
+  const txRef = reference || `TX_DB_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+  const idemp = idempotencyKey || txRef;
+  const current = await getWalletBalance(userId);
+  const totalAvailable = (current.balanceMinor || 0) + (current.bonusBalanceMinor || 0);
+  if (totalAvailable < amountMinor) {
+    return {
+      success: false,
+      newBalance: current.balanceMinor,
+      bonusDeducted: 0,
+      realDeducted: 0,
+      error: `Insufficient balance (${totalAvailable} RWF available: ${current.bonusBalanceMinor} RWF bonus + ${current.balanceMinor} RWF deposits, ${amountMinor} RWF required). Please top up.`
+    };
+  }
+  let remainingToDeduct = amountMinor;
+  let bonusDeducted = 0;
+  if (current.bonusBalanceMinor > 0) {
+    bonusDeducted = Math.min(current.bonusBalanceMinor, remainingToDeduct);
+    current.bonusBalanceMinor -= bonusDeducted;
+    remainingToDeduct -= bonusDeducted;
+  }
+  let realDeducted = 0;
+  if (remainingToDeduct > 0) {
+    realDeducted = remainingToDeduct;
+    current.balanceMinor -= realDeducted;
+  }
+  memoryStore.wallets.set(userId, current);
+  const detailDesc = bonusDeducted > 0 && realDeducted > 0 ? `${description} (Paid ${bonusDeducted} RWF from Welcome Bonus + ${realDeducted} RWF from Wallet)` : bonusDeducted > 0 ? `${description} (Paid entirely from Welcome Bonus: ${bonusDeducted} RWF)` : description;
+  const txRecord = {
+    id: crypto.randomUUID(),
+    walletId: `w-${userId}`,
+    userId,
+    amountMinor: -amountMinor,
+    currency: current.currency,
+    type,
+    description: detailDesc,
+    reference: txRef,
+    idempotencyKey: idemp,
+    status: "completed",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.transactions.unshift(txRecord);
+  return {
+    success: true,
+    newBalance: current.balanceMinor,
+    bonusDeducted,
+    realDeducted
+  };
+}
+async function requestWithdrawal(userId, amountMinor, payoutMethod, payoutAccount, accountHolderName, bankName) {
+  await loadAdminSettingsFromDb().catch(() => {
+  });
+  const minThreshold = Number(memoryStore.adminSettings.get("minimum_withdrawal_amount") ?? BUSINESS_CONFIG.MINIMUM_WITHDRAWAL_RWF);
+  if (amountMinor < minThreshold) {
+    return {
+      success: false,
+      error: `Minimum withdrawal amount is ${minThreshold.toLocaleString()} RWF. (Requested: ${amountMinor.toLocaleString()} RWF).`
+    };
+  }
+  const wallet = await getWalletBalance(userId);
+  const availableWithdrawable = wallet.balanceMinor;
+  if (availableWithdrawable < amountMinor) {
+    return {
+      success: false,
+      error: `Insufficient withdrawable balance. You have ${availableWithdrawable.toLocaleString()} RWF withdrawable (Welcome bonus cannot be withdrawn directly, only spent).`
+    };
+  }
+  wallet.savedPayoutMethod = payoutMethod;
+  wallet.savedPayoutAccount = payoutAccount.trim();
+  wallet.savedPayoutAccountName = accountHolderName.trim();
+  wallet.savedBankName = bankName?.trim();
+  wallet.balanceMinor -= amountMinor;
+  wallet.withdrawableEarnedMinor = Math.max(0, (wallet.withdrawableEarnedMinor || 0) - amountMinor);
+  memoryStore.wallets.set(userId, wallet);
+  const txRef = `WTH_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
+  const withdrawal = {
+    id: "wth-" + Date.now(),
+    userId,
+    amountMinor,
+    currency: wallet.currency,
+    payoutMethod,
+    payoutAccount: payoutAccount.trim(),
+    accountHolderName: accountHolderName.trim(),
+    bankName: bankName?.trim(),
+    status: "pending",
+    reference: txRef,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.withdrawals = memoryStore.withdrawals || [];
+  memoryStore.withdrawals.unshift(withdrawal);
+  const methodLabel = payoutMethod === "momo" ? "MTN MoMo" : payoutMethod === "airtel" ? "Airtel Money" : `Bank (${bankName || "Transfer"})`;
+  const txRecord = {
+    id: crypto.randomUUID(),
+    walletId: `w-${userId}`,
+    userId,
+    amountMinor: -amountMinor,
+    currency: wallet.currency,
+    type: "withdrawal",
+    description: `Withdrawal request to ${methodLabel} (${payoutAccount}) - Processing`,
+    reference: txRef,
+    status: "pending",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  memoryStore.transactions.unshift(txRecord);
+  return { success: true, withdrawal };
+}
+async function getTransactionHistory(userId) {
+  return memoryStore.transactions.filter((t) => t.userId === userId);
+}
+async function getWithdrawalHistory(userId) {
+  return (memoryStore.withdrawals || []).filter((w) => w.userId === userId);
+}
+
 // api/_routes/auth/register.ts
 async function handler(req, res) {
   if (req.method !== "POST") {
@@ -1346,7 +1646,8 @@ async function handler(req, res) {
       minAgePref,
       maxAgePref,
       datingScope,
-      appearanceSkinTone
+      appearanceSkinTone,
+      referralCode
     } = req.body || {};
     if (!email || !password || !dob || !displayName || !gender || !interestedIn) {
       return res.status(400).json({
@@ -1368,10 +1669,11 @@ async function handler(req, res) {
       });
     }
     const passwordHash = await hashPassword(password);
-    const userId = crypto.randomUUID();
-    const profileId = crypto.randomUUID();
+    const userId = crypto2.randomUUID();
+    const profileId = crypto2.randomUUID();
     const verificationCode = Math.floor(1e5 + Math.random() * 9e5).toString();
-    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationToken = crypto2.randomBytes(32).toString("hex");
+    const userReferralCode = userId.replace(/-/g, "").slice(0, 8).toUpperCase();
     const newUser = {
       id: userId,
       email: email.toLowerCase().trim(),
@@ -1381,6 +1683,8 @@ async function handler(req, res) {
       phone: phone || "",
       phoneCode: phoneCode || "+250",
       preferredLanguage: preferredLanguage || "en",
+      referralCode: userReferralCode,
+      referredBy: null,
       emailVerified: false,
       verificationCode,
       verificationToken,
@@ -1412,14 +1716,36 @@ async function handler(req, res) {
       appearanceSkinTone: appearanceSkinTone || null,
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
+    await loadAdminSettingsFromDb().catch(() => {
+    });
+    if (referralCode && typeof referralCode === "string" && referralCode.trim()) {
+      const trimmedRef = referralCode.trim().toUpperCase();
+      const referrer = memoryStore.users.find(
+        (u) => u.referralCode && u.referralCode.toUpperCase() === trimmedRef || u.id.replace(/-/g, "").toUpperCase().startsWith(trimmedRef) || u.id === referralCode.trim()
+      );
+      if (referrer && referrer.id !== userId) {
+        newUser.referredBy = referrer.id;
+        const refReward = Number(
+          memoryStore.adminSettings.get("referral_signup_reward") ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF
+        );
+        await creditReferralReward(referrer.id, refReward, newProfile.displayName).catch(
+          (err) => console.warn("Referral reward credit warning:", err)
+        );
+      }
+    }
     memoryStore.users.push(newUser);
     memoryStore.profiles.push(newProfile);
-    memoryStore.wallets.set(userId, { balanceMinor: 0, currency: "RWF" });
     memoryStore.allowances.set(userId, {
       initialRemaining: BUSINESS_CONFIG.FREE_INITIAL_MESSAGES,
       distinctRecipients: [],
       repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED
     });
+    const welcomeBonus = Number(
+      memoryStore.adminSettings.get("welcome_bonus_amount") ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF
+    );
+    await creditWelcomeBonus(userId, welcomeBonus).catch(
+      (err) => console.warn("Welcome bonus credit warning:", err)
+    );
     const proto = req.headers && req.headers["x-forwarded-proto"] || "https";
     const host = req.headers && (req.headers["x-forwarded-host"] || req.headers.host) || "kunda-rose.vercel.app";
     const appUrl = `${proto}://${host}`;
@@ -1459,7 +1785,8 @@ async function handler(req, res) {
         email: newUser.email,
         role: newUser.role,
         preferredLanguage: newUser.preferredLanguage,
-        emailVerified: false
+        emailVerified: false,
+        referralCode: newUser.referralCode
       },
       profile: newProfile
     });
@@ -1592,135 +1919,6 @@ async function handler2(req, res) {
 
 // api/_routes/auth/me.ts
 init_db();
-
-// api/_lib/wallet.ts
-init_db();
-import crypto2 from "crypto";
-async function getWalletBalance(userId) {
-  const res = await query("SELECT balance_minor, currency FROM wallets WHERE user_id = $1", [userId]);
-  if (res && res.rows && res.rows.length > 0) {
-    return {
-      balanceMinor: parseInt(res.rows[0].balance_minor, 10),
-      currency: res.rows[0].currency || "RWF"
-    };
-  }
-  const wallet = memoryStore.wallets.get(userId);
-  if (wallet) {
-    return wallet;
-  }
-  const initial = { balanceMinor: 0, currency: "RWF" };
-  memoryStore.wallets.set(userId, initial);
-  return initial;
-}
-async function creditWallet(userId, amountMinor, type, description, reference, idempotencyKey) {
-  if (amountMinor <= 0) {
-    return { success: false, newBalance: 0, error: "Credit amount must be greater than zero" };
-  }
-  const txRef = reference || `TX_CR_${Date.now()}_${crypto2.randomBytes(4).toString("hex")}`;
-  const idemp = idempotencyKey || txRef;
-  const existing = memoryStore.transactions.find((t) => t.idempotencyKey === idemp || t.reference === txRef);
-  if (existing) {
-    const current2 = await getWalletBalance(userId);
-    return { success: true, newBalance: current2.balanceMinor };
-  }
-  const dbRes = await query(
-    `INSERT INTO wallet_transactions (wallet_id, user_id, amount_minor, currency, type, description, reference, idempotency_key, status)
-     VALUES ((SELECT id FROM wallets WHERE user_id = $1), $1, $2, 'RWF', $3, $4, $5, $6, 'completed')
-     RETURNING amount_minor`,
-    [userId, amountMinor, type, description, txRef, idemp]
-  );
-  if (dbRes) {
-    await query(`UPDATE wallets SET balance_minor = balance_minor + $1 WHERE user_id = $2`, [amountMinor, userId]);
-    const updated = await getWalletBalance(userId);
-    return { success: true, newBalance: updated.balanceMinor };
-  }
-  const current = memoryStore.wallets.get(userId) || { balanceMinor: 0, currency: "RWF" };
-  const newBalance = current.balanceMinor + amountMinor;
-  memoryStore.wallets.set(userId, { balanceMinor: newBalance, currency: current.currency });
-  const txRecord = {
-    id: crypto2.randomUUID(),
-    walletId: `w-${userId}`,
-    userId,
-    amountMinor,
-    currency: current.currency,
-    type,
-    description,
-    reference: txRef,
-    idempotencyKey: idemp,
-    status: "completed",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  memoryStore.transactions.unshift(txRecord);
-  return { success: true, newBalance };
-}
-async function debitWallet(userId, amountMinor, type, description, reference, idempotencyKey) {
-  if (amountMinor <= 0) {
-    return { success: false, newBalance: 0, error: "Debit amount must be greater than zero" };
-  }
-  const txRef = reference || `TX_DB_${Date.now()}_${crypto2.randomBytes(4).toString("hex")}`;
-  const idemp = idempotencyKey || txRef;
-  const existing = memoryStore.transactions.find((t) => t.idempotencyKey === idemp || t.reference === txRef);
-  if (existing) {
-    const current2 = await getWalletBalance(userId);
-    return { success: true, newBalance: current2.balanceMinor };
-  }
-  const current = await getWalletBalance(userId);
-  if (current.balanceMinor < amountMinor) {
-    return {
-      success: false,
-      newBalance: current.balanceMinor,
-      error: `Insufficient wallet balance (${current.balanceMinor} RWF available, ${amountMinor} RWF required). Please top up.`
-    };
-  }
-  const newBalance = current.balanceMinor - amountMinor;
-  memoryStore.wallets.set(userId, { balanceMinor: newBalance, currency: current.currency });
-  const txRecord = {
-    id: crypto2.randomUUID(),
-    walletId: `w-${userId}`,
-    userId,
-    amountMinor: -amountMinor,
-    // negative in ledger
-    currency: current.currency,
-    type,
-    description,
-    reference: txRef,
-    idempotencyKey: idemp,
-    status: "completed",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  memoryStore.transactions.unshift(txRecord);
-  await query(
-    `INSERT INTO wallet_transactions (wallet_id, user_id, amount_minor, currency, type, description, reference, idempotency_key, status)
-     VALUES ((SELECT id FROM wallets WHERE user_id = $1), $1, $2, 'RWF', $3, $4, $5, $6, 'completed')`,
-    [userId, -amountMinor, type, description, txRef, idemp]
-  );
-  await query(`UPDATE wallets SET balance_minor = balance_minor - $1 WHERE user_id = $2`, [amountMinor, userId]);
-  return { success: true, newBalance };
-}
-async function getTransactionHistory(userId) {
-  const res = await query(
-    `SELECT id, amount_minor, currency, type, description, reference, status, created_at 
-     FROM wallet_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
-    [userId]
-  );
-  if (res && res.rows && res.rows.length > 0) {
-    return res.rows.map((r) => ({
-      id: r.id,
-      walletId: `w-${userId}`,
-      userId,
-      amountMinor: parseInt(r.amount_minor, 10),
-      currency: r.currency,
-      type: r.type,
-      description: r.description,
-      reference: r.reference,
-      status: r.status,
-      createdAt: r.created_at
-    }));
-  }
-  return memoryStore.transactions.filter((t) => t.userId === userId);
-}
-
-// api/_routes/auth/me.ts
 async function handler3(req, res) {
   const auth = extractAuthUser(req);
   if (!auth) {
@@ -1763,7 +1961,8 @@ async function handler3(req, res) {
       dob: user.dob,
       phone: user.phone,
       phoneCode: user.phoneCode,
-      preferredLanguage: user.preferredLanguage
+      preferredLanguage: user.preferredLanguage,
+      referralCode: user.referralCode || user.id.replace(/-/g, "").slice(0, 8).toUpperCase()
     },
     profile,
     wallet,
@@ -3143,6 +3342,12 @@ async function handler14(req, res) {
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
   memoryStore.contactUnlocks.push(unlockRecord);
+  const unlockCommissionPct = Number(
+    memoryStore.adminSettings.get("contact_unlock_commission_pct") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT
+  );
+  await creditUnlockCommission(targetUserId, unlockCost, unlockCommissionPct).catch(
+    (err) => console.warn("Unlock commission credit warning:", err)
+  );
   const requesterProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
   memoryStore.notifications.unshift({
     id: crypto8.randomUUID(),
@@ -3164,28 +3369,74 @@ async function handler14(req, res) {
 }
 
 // api/_routes/wallet/balance.ts
+init_db();
 async function handler15(req, res) {
   const auth = extractAuthUser(req);
   if (!auth) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
+  await loadAdminSettingsFromDb().catch(() => {
+  });
   const wallet = await getWalletBalance(auth.userId);
   const transactions = await getTransactionHistory(auth.userId);
   let totalDeposits = 0;
   let totalSpent = 0;
+  let referralEarnings = 0;
   for (const t of transactions) {
     if (t.status === "completed") {
       if (t.amountMinor > 0) {
-        totalDeposits += t.amountMinor;
+        if (t.type === "referral_signup_reward" || t.type === "referral_deposit_commission" || t.type === "contact_unlock_commission") {
+          referralEarnings += t.amountMinor;
+        } else if (t.type === "deposit") {
+          totalDeposits += t.amountMinor;
+        }
       } else {
         totalSpent += Math.abs(t.amountMinor);
       }
     }
   }
+  const user = memoryStore.users.find((u) => u.id === auth.userId);
+  const userReferralCode = user?.referralCode || auth.userId.replace(/-/g, "").slice(0, 8).toUpperCase();
+  const referredUsersCount = memoryStore.users.filter((u) => u.referredBy === auth.userId).length;
+  const minWithdrawal = Number(
+    memoryStore.adminSettings.get("minimum_withdrawal_amount") ?? BUSINESS_CONFIG.MINIMUM_WITHDRAWAL_RWF
+  );
+  const welcomeBonus = Number(
+    memoryStore.adminSettings.get("welcome_bonus_amount") ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF
+  );
+  const referralReward = Number(
+    memoryStore.adminSettings.get("referral_signup_reward") ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF
+  );
+  const referralDepositCommissionPct = Number(
+    memoryStore.adminSettings.get("referral_deposit_commission_pct") ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT
+  );
+  const contactUnlockCommissionPct = Number(
+    memoryStore.adminSettings.get("contact_unlock_commission_pct") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT
+  );
   return res.status(200).json({
     success: true,
     balance: wallet.balanceMinor,
-    currency: wallet.currency,
+    // Withdrawable balance (deposits + earnings)
+    bonusBalance: wallet.bonusBalanceMinor || 0,
+    // Welcome bonus (spendable on services, non-withdrawable)
+    totalAvailable: (wallet.balanceMinor || 0) + (wallet.bonusBalanceMinor || 0),
+    withdrawableEarned: wallet.withdrawableEarnedMinor || referralEarnings,
+    currency: wallet.currency || "RWF",
+    referralCode: userReferralCode,
+    referredUsersCount,
+    savedPayout: {
+      method: wallet.savedPayoutMethod || null,
+      account: wallet.savedPayoutAccount || null,
+      accountName: wallet.savedPayoutAccountName || null,
+      bankName: wallet.savedBankName || null
+    },
+    settings: {
+      minWithdrawal,
+      welcomeBonus,
+      referralReward,
+      referralDepositCommissionPct,
+      contactUnlockCommissionPct
+    },
     totalDeposits,
     totalSpent
   });
@@ -3202,6 +3453,68 @@ async function handler16(req, res) {
     success: true,
     transactions
   });
+}
+
+// api/_routes/wallet/withdraw.ts
+async function handler17(req, res) {
+  const auth = extractAuthUser(req);
+  if (!auth) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  if (req.method === "GET") {
+    const history = await getWithdrawalHistory(auth.userId);
+    return res.status(200).json({ success: true, withdrawals: history });
+  }
+  if (req.method === "POST") {
+    const { amount, payoutMethod, payoutAccount, accountHolderName, bankName } = req.body || {};
+    const amountNum = parseInt(amount, 10);
+    if (!amountNum || isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({ success: false, error: "Please enter a valid withdrawal amount." });
+    }
+    if (!payoutMethod || !["momo", "airtel", "bank"].includes(payoutMethod)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid payout method. Please choose MTN MoMo, Airtel Money, or Bank Transfer."
+      });
+    }
+    if (!payoutAccount || typeof payoutAccount !== "string" || !payoutAccount.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Payout account/phone number is required."
+      });
+    }
+    if (!accountHolderName || typeof accountHolderName !== "string" || !accountHolderName.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Account holder name is required."
+      });
+    }
+    if (payoutMethod === "bank" && (!bankName || !bankName.trim())) {
+      return res.status(400).json({
+        success: false,
+        error: "Bank name is required for bank transfers (e.g. Bank of Kigali, Equity, I&M)."
+      });
+    }
+    const result = await requestWithdrawal(
+      auth.userId,
+      amountNum,
+      payoutMethod,
+      payoutAccount,
+      accountHolderName,
+      bankName
+    );
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+    const updatedWallet = await getWalletBalance(auth.userId);
+    return res.status(200).json({
+      success: true,
+      message: "Withdrawal request submitted successfully. Funds will be sent to your account.",
+      withdrawal: result.withdrawal,
+      wallet: updatedWallet
+    });
+  }
+  return res.status(405).json({ success: false, error: "Method not allowed" });
 }
 
 // api/_routes/payments/initialize.ts
@@ -3292,7 +3605,7 @@ async function verifyPaymentWithFlutterwave(transactionId) {
 }
 
 // api/_routes/payments/initialize.ts
-async function handler17(req, res) {
+async function handler18(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
@@ -3324,7 +3637,7 @@ async function handler17(req, res) {
 // api/_routes/payments/webhook.ts
 init_db();
 import crypto10 from "crypto";
-async function handler18(req, res) {
+async function handler19(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
@@ -3355,6 +3668,16 @@ async function handler18(req, res) {
       txRef
       // Idempotency key
     );
+    if (user.referredBy) {
+      await loadAdminSettingsFromDb().catch(() => {
+      });
+      const commPct = Number(
+        memoryStore.adminSettings.get("referral_deposit_commission_pct") ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT
+      );
+      await creditDepositCommission(user.referredBy, amount, commPct).catch(
+        (err) => console.warn("Webhook referral deposit commission warning:", err)
+      );
+    }
     memoryStore.notifications.unshift({
       id: crypto10.randomUUID(),
       userId: user.id,
@@ -3373,7 +3696,7 @@ async function handler18(req, res) {
 // api/_routes/payments/verify.ts
 init_db();
 import crypto11 from "crypto";
-async function handler19(req, res) {
+async function handler20(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
@@ -3407,6 +3730,17 @@ async function handler19(req, res) {
     txRef,
     txRef
   );
+  const depositingUser = memoryStore.users.find((u) => u.id === auth.userId);
+  if (depositingUser?.referredBy) {
+    await loadAdminSettingsFromDb().catch(() => {
+    });
+    const commPct = Number(
+      memoryStore.adminSettings.get("referral_deposit_commission_pct") ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT
+    );
+    await creditDepositCommission(depositingUser.referredBy, depositAmount, commPct).catch(
+      (err) => console.warn("Referral deposit commission warning:", err)
+    );
+  }
   memoryStore.notifications.unshift({
     id: crypto11.randomUUID(),
     userId: auth.userId,
@@ -3427,7 +3761,7 @@ async function handler19(req, res) {
 
 // api/_routes/subscriptions/plans.ts
 init_db();
-async function handler20(req, res) {
+async function handler21(req, res) {
   await loadAdminSettingsFromDb();
   const hourlyPrice = Number(memoryStore.adminSettings.get("hourly_pass_cost") ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF);
   const threeDayPrice = Number(memoryStore.adminSettings.get("three_day_pass_cost") ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF);
@@ -3461,17 +3795,17 @@ async function handler20(req, res) {
     },
     {
       code: "hourly",
-      name_en: "Hourly Pass (24 Hours)",
-      name_rw: "Pass y'Amasaha 24",
-      name_fr: "Pass Connexion 24 Heures",
-      description_en: `Unlimited messaging for 24 hours. Quick connection boost for ${hourlyPrice.toLocaleString()} ${currency}.`,
+      name_en: "24-Hour Pass (Daily)",
+      name_rw: "Pass y'Amasaha 24 (Umunsi 1)",
+      name_fr: "Pass 24 Heures (Journalier)",
+      description_en: `Unlimited messaging for 24 hours for ${hourlyPrice.toLocaleString()} ${currency}.`,
       description_rw: `Ubutumwa budafite umupaka mu masaha 24 kuri ${hourlyPrice.toLocaleString()} ${currency}.`,
       description_fr: `Messagerie illimit\xE9e pendant 24 heures pour ${hourlyPrice.toLocaleString()} ${currency}.`,
       price: hourlyPrice,
       currency,
       durationDays: 1,
       features: [
-        "Unlimited Outgoing Messages for 24h",
+        "Unlimited Messaging for 24 Hours",
         "Instant Profile Match Delivery",
         "No per-message deductions",
         "Safe internal chat delivery"
@@ -3549,6 +3883,10 @@ async function handler20(req, res) {
       ]
     }
   ];
+  const welcomeBonus = Number(memoryStore.adminSettings.get("welcome_bonus_amount") ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF);
+  const referralReward = Number(memoryStore.adminSettings.get("referral_signup_reward") ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF);
+  const referralDepositCommissionPct = Number(memoryStore.adminSettings.get("referral_deposit_commission_pct") ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT);
+  const contactUnlockCommissionPct = Number(memoryStore.adminSettings.get("contact_unlock_commission_pct") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT);
   return res.status(200).json({
     success: true,
     plans,
@@ -3561,6 +3899,10 @@ async function handler20(req, res) {
       weeklyPassPrice: weeklyPrice,
       payPerMessagePrice,
       contactUnlockPrice,
+      welcomeBonus,
+      referralReward,
+      referralDepositCommissionPct,
+      contactUnlockCommissionPct,
       currency
     }
   });
@@ -3569,7 +3911,7 @@ async function handler20(req, res) {
 // api/_routes/subscriptions/subscribe.ts
 import crypto12 from "crypto";
 init_db();
-async function handler21(req, res) {
+async function handler22(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
@@ -3579,16 +3921,16 @@ async function handler21(req, res) {
   }
   await loadAdminSettingsFromDb();
   const { planCode } = req.body;
-  if (!planCode || !["hourly", "three_day", "weekly"].includes(planCode)) {
-    return res.status(400).json({ success: false, error: "Valid planCode (hourly, three_day, weekly) is required" });
+  if (!planCode || !["hourly", "daily", "daily_24h", "three_day", "weekly"].includes(planCode)) {
+    return res.status(400).json({ success: false, error: "Valid planCode is required" });
   }
   let price = 0;
   let durationDays = 0;
   let planName = "";
-  if (planCode === "hourly") {
+  if (planCode === "hourly" || planCode === "daily" || planCode === "daily_24h") {
     price = Number(memoryStore.adminSettings.get("hourly_pass_cost") ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF);
     durationDays = 1;
-    planName = "Hourly Pass (24 Hours)";
+    planName = "24-Hour Pass (Daily)";
   } else if (planCode === "three_day") {
     price = Number(memoryStore.adminSettings.get("three_day_pass_cost") ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF);
     durationDays = 3;
@@ -3652,7 +3994,7 @@ async function handler21(req, res) {
 
 // api/_routes/notifications/index.ts
 init_db();
-async function handler22(req, res) {
+async function handler23(req, res) {
   const auth = extractAuthUser(req);
   if (!auth) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
@@ -3691,7 +4033,7 @@ async function handler22(req, res) {
 
 // api/_routes/stories/index.ts
 init_db();
-async function handler23(req, res) {
+async function handler24(req, res) {
   if (req.method === "GET") {
     const auth = extractAuthUser(req);
     const now = (/* @__PURE__ */ new Date()).getTime();
@@ -3837,7 +4179,7 @@ async function handler23(req, res) {
 
 // api/_routes/posts/index.ts
 init_db();
-async function handler24(req, res) {
+async function handler25(req, res) {
   if (req.method === "GET") {
     const auth = extractAuthUser(req);
     const postsList = [...memoryStore.posts || []].reverse();
@@ -4042,7 +4384,7 @@ async function handler24(req, res) {
 
 // api/_routes/admin/metrics.ts
 init_db();
-async function handler25(req, res) {
+async function handler26(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin", "moderator"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -4089,7 +4431,7 @@ async function handler25(req, res) {
 
 // api/_routes/admin/users.ts
 init_db();
-async function handler26(req, res) {
+async function handler27(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin", "moderator"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -4191,7 +4533,7 @@ async function handler26(req, res) {
 
 // api/_routes/admin/settings.ts
 init_db();
-async function handler27(req, res) {
+async function handler28(req, res) {
   await loadAdminSettingsFromDb();
   if (req.method === "GET" && req.query?.public === "true") {
     return res.status(200).json({
@@ -4205,6 +4547,11 @@ async function handler27(req, res) {
         weeklyPassPrice: Number(memoryStore.adminSettings.get("weekly_pass_cost") ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF),
         payPerMessagePrice: Number(memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF),
         contactUnlockPrice: Number(memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF),
+        welcomeBonusAmount: Number(memoryStore.adminSettings.get("welcome_bonus_amount") ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF),
+        referralSignupReward: Number(memoryStore.adminSettings.get("referral_signup_reward") ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF),
+        referralDepositCommissionPct: Number(memoryStore.adminSettings.get("referral_deposit_commission_pct") ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT),
+        contactUnlockCommissionPct: Number(memoryStore.adminSettings.get("contact_unlock_commission_pct") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT),
+        minimumWithdrawalAmount: Number(memoryStore.adminSettings.get("minimum_withdrawal_amount") ?? BUSINESS_CONFIG.MINIMUM_WITHDRAWAL_RWF),
         defaultCurrency: memoryStore.adminSettings.get("default_currency") || BUSINESS_CONFIG.DEFAULT_CURRENCY
       }
     });
@@ -4225,6 +4572,11 @@ async function handler27(req, res) {
       weeklyPassPrice: memoryStore.adminSettings.get("weekly_pass_cost") ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF,
       payPerMessagePrice: memoryStore.adminSettings.get("pay_per_message_cost") ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF,
       contactUnlockPrice: memoryStore.adminSettings.get("contact_unlock_cost") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF,
+      welcomeBonusAmount: memoryStore.adminSettings.get("welcome_bonus_amount") ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF,
+      referralSignupReward: memoryStore.adminSettings.get("referral_signup_reward") ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF,
+      referralDepositCommissionPct: memoryStore.adminSettings.get("referral_deposit_commission_pct") ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT,
+      contactUnlockCommissionPct: memoryStore.adminSettings.get("contact_unlock_commission_pct") ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT,
+      minimumWithdrawalAmount: memoryStore.adminSettings.get("minimum_withdrawal_amount") ?? BUSINESS_CONFIG.MINIMUM_WITHDRAWAL_RWF,
       defaultCurrency: memoryStore.adminSettings.get("default_currency") ?? BUSINESS_CONFIG.DEFAULT_CURRENCY,
       moderationStrictness: memoryStore.adminSettings.get("moderation_strictness") ?? "high",
       // Email Provider settings
@@ -4283,6 +4635,21 @@ async function handler27(req, res) {
     if (updates.contactUnlockPrice !== void 0) {
       savePromises.push(saveAdminSettingToDb("contact_unlock_cost", parseInt(updates.contactUnlockPrice, 10)));
     }
+    if (updates.welcomeBonusAmount !== void 0) {
+      savePromises.push(saveAdminSettingToDb("welcome_bonus_amount", parseInt(updates.welcomeBonusAmount, 10)));
+    }
+    if (updates.referralSignupReward !== void 0) {
+      savePromises.push(saveAdminSettingToDb("referral_signup_reward", parseInt(updates.referralSignupReward, 10)));
+    }
+    if (updates.referralDepositCommissionPct !== void 0) {
+      savePromises.push(saveAdminSettingToDb("referral_deposit_commission_pct", parseInt(updates.referralDepositCommissionPct, 10)));
+    }
+    if (updates.contactUnlockCommissionPct !== void 0) {
+      savePromises.push(saveAdminSettingToDb("contact_unlock_commission_pct", parseInt(updates.contactUnlockCommissionPct, 10)));
+    }
+    if (updates.minimumWithdrawalAmount !== void 0) {
+      savePromises.push(saveAdminSettingToDb("minimum_withdrawal_amount", parseInt(updates.minimumWithdrawalAmount, 10)));
+    }
     if (updates.defaultCurrency !== void 0) {
       savePromises.push(saveAdminSettingToDb("default_currency", updates.defaultCurrency));
     }
@@ -4310,7 +4677,7 @@ async function handler27(req, res) {
 
 // api/_routes/admin/moderation.ts
 init_db();
-async function handler28(req, res) {
+async function handler29(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin", "moderator"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -4333,7 +4700,7 @@ async function handler28(req, res) {
 
 // api/_routes/admin/ledger.ts
 init_db();
-async function handler29(req, res) {
+async function handler30(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -4378,7 +4745,7 @@ try {
   if (backupModule) runDatabaseBackup2 = backupModule.runDatabaseBackup;
 } catch (e) {
 }
-async function handler30(req, res) {
+async function handler31(req, res) {
   const auth = extractAuthUser(req);
   if (!auth || !isAuthorizedRole(auth.role, ["super_admin", "admin"])) {
     return res.status(403).json({ success: false, error: "Forbidden: Admin access required." });
@@ -4448,27 +4815,28 @@ var routes = {
   "messages/unlock-contact": handler14,
   "wallet/balance": handler15,
   "wallet/transactions": handler16,
-  "payments/initialize": handler17,
-  "payments/webhook": handler18,
-  "payments/verify": handler19,
-  "subscriptions/plans": handler20,
-  "subscriptions/subscribe": handler21,
-  "notifications": handler22,
-  "stories": handler23,
-  "posts": handler24,
+  "wallet/withdraw": handler17,
+  "payments/initialize": handler18,
+  "payments/webhook": handler19,
+  "payments/verify": handler20,
+  "subscriptions/plans": handler21,
+  "subscriptions/subscribe": handler22,
+  "notifications": handler23,
+  "stories": handler24,
+  "posts": handler25,
   "settings/public": (req, res) => {
     req.query = req.query || {};
     req.query.public = "true";
-    return handler27(req, res);
+    return handler28(req, res);
   },
-  "admin/metrics": handler25,
-  "admin/users": handler26,
-  "admin/settings": handler27,
-  "admin/moderation": handler28,
-  "admin/ledger": handler29,
-  "admin/backup": handler30
+  "admin/metrics": handler26,
+  "admin/users": handler27,
+  "admin/settings": handler28,
+  "admin/moderation": handler29,
+  "admin/ledger": handler30,
+  "admin/backup": handler31
 };
-async function handler31(req, res) {
+async function handler32(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -4538,5 +4906,5 @@ async function handler31(req, res) {
   }
 }
 export {
-  handler31 as default
+  handler32 as default
 };

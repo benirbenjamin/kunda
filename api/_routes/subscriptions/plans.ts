@@ -42,17 +42,17 @@ export default async function handler(req: any, res: any) {
     },
     {
       code: 'hourly',
-      name_en: 'Hourly Pass (24 Hours)',
-      name_rw: "Pass y'Amasaha 24",
-      name_fr: 'Pass Connexion 24 Heures',
-      description_en: `Unlimited messaging for 24 hours. Quick connection boost for ${hourlyPrice.toLocaleString()} ${currency}.`,
+      name_en: '24-Hour Pass (Daily)',
+      name_rw: "Pass y'Amasaha 24 (Umunsi 1)",
+      name_fr: 'Pass 24 Heures (Journalier)',
+      description_en: `Unlimited messaging for 24 hours for ${hourlyPrice.toLocaleString()} ${currency}.`,
       description_rw: `Ubutumwa budafite umupaka mu masaha 24 kuri ${hourlyPrice.toLocaleString()} ${currency}.`,
       description_fr: `Messagerie illimitée pendant 24 heures pour ${hourlyPrice.toLocaleString()} ${currency}.`,
       price: hourlyPrice,
       currency,
       durationDays: 1,
       features: [
-        'Unlimited Outgoing Messages for 24h',
+        'Unlimited Messaging for 24 Hours',
         'Instant Profile Match Delivery',
         'No per-message deductions',
         'Safe internal chat delivery'
@@ -131,6 +131,11 @@ export default async function handler(req: any, res: any) {
     }
   ];
 
+  const welcomeBonus = Number(memoryStore.adminSettings.get('welcome_bonus_amount') ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF);
+  const referralReward = Number(memoryStore.adminSettings.get('referral_signup_reward') ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF);
+  const referralDepositCommissionPct = Number(memoryStore.adminSettings.get('referral_deposit_commission_pct') ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT);
+  const contactUnlockCommissionPct = Number(memoryStore.adminSettings.get('contact_unlock_commission_pct') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT);
+
   return res.status(200).json({
     success: true,
     plans,
@@ -143,6 +148,10 @@ export default async function handler(req: any, res: any) {
       weeklyPassPrice: weeklyPrice,
       payPerMessagePrice,
       contactUnlockPrice,
+      welcomeBonus,
+      referralReward,
+      referralDepositCommissionPct,
+      contactUnlockCommissionPct,
       currency
     }
   });

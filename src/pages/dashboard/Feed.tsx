@@ -169,16 +169,22 @@ export const Feed: React.FC = () => {
     setPostError('');
 
     try {
-      // Upload compressed images
+      // Upload compressed images with safe fallback to dataUrl
       const uploadedUrls: string[] = [];
       for (let i = 0; i < compressedPhotos.length; i++) {
-        const uploadRes = await api.post('/upload', {
-          fileBase64: compressedPhotos[i],
-          filename: `post_${Date.now()}_${i}.jpg`,
-          mimeType: 'image/jpeg',
-        });
-        if (uploadRes.data?.success && uploadRes.data?.url) {
-          uploadedUrls.push(uploadRes.data.url);
+        try {
+          const uploadRes = await api.post('/upload', {
+            fileBase64: compressedPhotos[i],
+            filename: `post_${Date.now()}_${i}.jpg`,
+            mimeType: 'image/jpeg',
+          });
+          if (uploadRes.data?.success && uploadRes.data?.url) {
+            uploadedUrls.push(uploadRes.data.url);
+          } else {
+            uploadedUrls.push(compressedPhotos[i]);
+          }
+        } catch {
+          uploadedUrls.push(compressedPhotos[i]);
         }
       }
 
@@ -381,23 +387,24 @@ export const Feed: React.FC = () => {
             )}
 
             {/* Bottom Actions of Create Post */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <div className="flex items-center gap-2">
+            {/* Bottom Actions of Create Post */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isCompressingPhotos}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 rounded-xl transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
                 >
                   <ImageIcon className="w-4 h-4 text-rose-500" />
-                  {isCompressingPhotos ? 'Compressing...' : 'Add Photos'}
+                  <span>{isCompressingPhotos ? 'Compressing...' : 'Add Photos'}</span>
                 </button>
 
                 {/* Vibe / Feeling Picker */}
                 <select
                   value={selectedFeeling}
                   onChange={(e) => setSelectedFeeling(e.target.value)}
-                  className="text-xs bg-slate-100 border-none text-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-rose-500 cursor-pointer"
+                  className="text-xs bg-slate-100 border-none text-slate-700 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-rose-500 cursor-pointer max-w-[130px] sm:max-w-[160px]"
                 >
                   <option value="">Feeling / Vibe...</option>
                   {feelingsList.map((f) => (
@@ -411,7 +418,7 @@ export const Feed: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSubmittingPost || isCompressingPhotos}
-                className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-500/20 disabled:opacity-50 transition-all"
+                className="flex items-center gap-1.5 px-4 sm:px-5 py-2 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-500/20 disabled:opacity-50 transition-all shrink-0 ml-auto"
               >
                 {isSubmittingPost ? (
                   <>

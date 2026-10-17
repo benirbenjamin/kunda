@@ -143,6 +143,15 @@ export const BottomNav: React.FC = () => {
               <span className="text-[10px] mt-0.5">Home</span>
             </Link>
             <Link
+              to="/make-money"
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+                isActive('/make-money') ? 'text-emerald-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Sparkles className="w-5 h-5 text-emerald-500" />
+              <span className="text-[10px] mt-0.5 font-bold">Earn</span>
+            </Link>
+            <Link
               to="/membership"
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
                 isActive('/membership') ? 'text-rose-600 font-bold' : 'text-slate-400 hover:text-slate-600'

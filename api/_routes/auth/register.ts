@@ -3,9 +3,10 @@
 // =====================================================================
 import crypto from 'crypto';
 import { isAdult, hashPassword, generateToken } from '../../_lib/auth.js';
-import { memoryStore, query } from '../../_lib/db.js';
+import { memoryStore, query, loadAdminSettingsFromDb } from '../../_lib/db.js';
 import { BUSINESS_CONFIG } from '../../_lib/config.js';
 import { sendVerificationEmail } from '../../_lib/email.js';
+import { creditWelcomeBonus, creditReferralReward } from '../../_lib/wallet.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -35,6 +36,7 @@ export default async function handler(req: any, res: any) {
       maxAgePref,
       datingScope,
       appearanceSkinTone,
+      referralCode,
     } = req.body || {};
 
     // 1. Mandatory server-side fields check
@@ -71,7 +73,9 @@ export default async function handler(req: any, res: any) {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    const newUser = {
+    const userReferralCode = userId.replace(/-/g, '').slice(0, 8).toUpperCase();
+
+    const newUser: any = {
       id: userId,
       email: email.toLowerCase().trim(),
       passwordHash,
@@ -80,6 +84,8 @@ export default async function handler(req: any, res: any) {
       phone: phone || '',
       phoneCode: phoneCode || '+250',
       preferredLanguage: preferredLanguage || 'en',
+      referralCode: userReferralCode,
+      referredBy: null,
       emailVerified: false,
       verificationCode,
       verificationToken,
@@ -115,15 +121,43 @@ export default async function handler(req: any, res: any) {
       createdAt: new Date().toISOString(),
     };
 
+    // Check for referral code and credit referrer with withdrawable reward
+    await loadAdminSettingsFromDb().catch(() => {});
+    if (referralCode && typeof referralCode === 'string' && referralCode.trim()) {
+      const trimmedRef = referralCode.trim().toUpperCase();
+      const referrer = memoryStore.users.find(
+        (u) =>
+          (u.referralCode && u.referralCode.toUpperCase() === trimmedRef) ||
+          u.id.replace(/-/g, '').toUpperCase().startsWith(trimmedRef) ||
+          u.id === referralCode.trim()
+      );
+      if (referrer && referrer.id !== userId) {
+        newUser.referredBy = referrer.id;
+        const refReward = Number(
+          memoryStore.adminSettings.get('referral_signup_reward') ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF
+        );
+        await creditReferralReward(referrer.id, refReward, newProfile.displayName).catch((err) =>
+          console.warn('Referral reward credit warning:', err)
+        );
+      }
+    }
+
     // Store in memoryStore
     memoryStore.users.push(newUser);
     memoryStore.profiles.push(newProfile);
-    memoryStore.wallets.set(userId, { balanceMinor: 0, currency: 'RWF' });
     memoryStore.allowances.set(userId, {
       initialRemaining: BUSINESS_CONFIG.FREE_INITIAL_MESSAGES,
       distinctRecipients: [],
       repliesRemaining: BUSINESS_CONFIG.FREE_REPLIES_ALLOWED,
     });
+
+    // Credit Welcome Bonus to new user (spendable before deposit!)
+    const welcomeBonus = Number(
+      memoryStore.adminSettings.get('welcome_bonus_amount') ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF
+    );
+    await creditWelcomeBonus(userId, welcomeBonus).catch((err) =>
+      console.warn('Welcome bonus credit warning:', err)
+    );
 
     // Fast non-blocking email dispatch: attempts delivery immediately without delaying HTTP response
     const proto = (req.headers && req.headers['x-forwarded-proto']) || 'https';
@@ -172,6 +206,7 @@ export default async function handler(req: any, res: any) {
         role: newUser.role,
         preferredLanguage: newUser.preferredLanguage,
         emailVerified: false,
+        referralCode: newUser.referralCode,
       },
       profile: newProfile,
     });

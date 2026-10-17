@@ -21,18 +21,18 @@ export default async function handler(req: any, res: any) {
   await loadAdminSettingsFromDb();
 
   const { planCode } = req.body;
-  if (!planCode || !['hourly', 'three_day', 'weekly'].includes(planCode)) {
-    return res.status(400).json({ success: false, error: 'Valid planCode (hourly, three_day, weekly) is required' });
+  if (!planCode || !['hourly', 'daily', 'daily_24h', 'three_day', 'weekly'].includes(planCode)) {
+    return res.status(400).json({ success: false, error: 'Valid planCode is required' });
   }
 
   let price = 0;
   let durationDays = 0;
   let planName = '';
 
-  if (planCode === 'hourly') {
+  if (planCode === 'hourly' || planCode === 'daily' || planCode === 'daily_24h') {
     price = Number(memoryStore.adminSettings.get('hourly_pass_cost') ?? BUSINESS_CONFIG.HOURLY_PASS_PRICE_RWF);
     durationDays = 1;
-    planName = 'Hourly Pass (24 Hours)';
+    planName = '24-Hour Pass (Daily)';
   } else if (planCode === 'three_day') {
     price = Number(memoryStore.adminSettings.get('three_day_pass_cost') ?? BUSINESS_CONFIG.THREE_DAY_PASS_PRICE_RWF);
     durationDays = 3;

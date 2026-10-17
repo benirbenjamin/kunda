@@ -27,8 +27,9 @@ export const Home: React.FC = () => {
   const [settings, setSettings] = useState<any>({
     freeInitialMessages: 3,
     freeReplies: 3,
-    threeDayPassPrice: 1500,
-    weeklyPassPrice: 3000,
+    hourlyPassPrice: 1500,
+    threeDayPassPrice: 3000,
+    weeklyPassPrice: 5000,
     currency: 'RWF',
   });
 
@@ -46,11 +47,11 @@ export const Home: React.FC = () => {
   }, []);
 
   const threeDayPlan = plans.find((p) => p.code === 'three_day') || {
-    price: settings.threeDayPassPrice ?? 1500,
+    price: settings.threeDayPassPrice ?? 3000,
     currency: settings.currency ?? 'RWF',
   };
   const weeklyPlan = plans.find((p) => p.code === 'weekly') || {
-    price: settings.weeklyPassPrice ?? 3000,
+    price: settings.weeklyPassPrice ?? 5000,
     currency: settings.currency ?? 'RWF',
   };
 

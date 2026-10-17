@@ -22,6 +22,7 @@ import sendHandler from './api/_routes/messages/send.js';
 import unlockContactHandler from './api/_routes/messages/unlock-contact.js';
 import balanceHandler from './api/_routes/wallet/balance.js';
 import transactionsHandler from './api/_routes/wallet/transactions.js';
+import withdrawHandler from './api/_routes/wallet/withdraw.js';
 import initPaymentHandler from './api/_routes/payments/initialize.js';
 import webhookHandler from './api/_routes/payments/webhook.js';
 import verifyPaymentHandler from './api/_routes/payments/verify.js';
@@ -92,6 +93,7 @@ bindRoute('/api/messages/unlock-contact', unlockContactHandler);
 // Wallet & Ledger
 bindRoute('/api/wallet/balance', balanceHandler);
 bindRoute('/api/wallet/transactions', transactionsHandler);
+bindRoute('/api/wallet/withdraw', withdrawHandler);
 
 // Payments (Flutterwave)
 bindRoute('/api/payments/initialize', initPaymentHandler);

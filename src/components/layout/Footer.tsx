@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ShieldCheck, Lock } from 'lucide-react';
+import { Heart, Lock, Download, Sparkles } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { usePwa } from '../../contexts/PwaContext';
 
 export const Footer: React.FC = () => {
   const { t, language, setLanguage, availableLanguages } = useLanguage();
+  const { isInstalled, installApp } = usePwa();
 
   return (
     <footer className="bg-slate-900 text-slate-300 pt-16 pb-12 border-t border-slate-800">
@@ -19,19 +21,36 @@ export const Footer: React.FC = () => {
               <span className="text-xl font-extrabold text-white tracking-tight">Kunda Space</span>
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed">{t('footer.tagline')}</p>
-            <div className="flex items-center gap-2 text-xs font-semibold text-rose-400 bg-rose-950/40 border border-rose-900/50 px-3 py-1.5 rounded-lg w-fit">
-              <Lock className="w-3.5 h-3.5" />
-              <span>Strictly 18+ Only</span>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 bg-rose-950/40 border border-rose-900/50 px-3 py-1.5 rounded-lg w-fit">
+                <Lock className="w-3.5 h-3.5" />
+                <span>Strictly 18+ Only</span>
+              </div>
+              {!isInstalled && (
+                <button
+                  onClick={installApp}
+                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 px-3 py-1.5 rounded-lg shadow-sm transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Install App</span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Col 2: Navigation */}
+          {/* Col 2: Navigation & Earn */}
           <div>
             <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Platform</h4>
             <ul className="space-y-2.5 text-sm">
               <li>
                 <Link to="/how-it-works" className="hover:text-rose-400 transition-colors">
                   {t('nav.howItWorks')}
+                </Link>
+              </li>
+              <li>
+                <Link to="/make-money" className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1.5 transition-colors">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Earn Money / Gushaka Amafaranga</span>
                 </Link>
               </li>
               <li>
@@ -104,11 +123,8 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Kunda Space. {t('footer.rights')}</p>
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Kigali, Rwanda & Worldwide</span>
-          </div>
+          <p>© {new Date().getFullYear()} Kunda Space. All rights reserved. Kigali, Rwanda.</p>
+          <p>Connecting Rwandan singles worldwide with mutual dignity & respect.</p>
         </div>
       </div>
     </footer>

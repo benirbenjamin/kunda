@@ -17,6 +17,7 @@ import sendHandler from './_routes/messages/send.js';
 import unlockContactHandler from './_routes/messages/unlock-contact.js';
 import balanceHandler from './_routes/wallet/balance.js';
 import transactionsHandler from './_routes/wallet/transactions.js';
+import withdrawHandler from './_routes/wallet/withdraw.js';
 import initPaymentHandler from './_routes/payments/initialize.js';
 import webhookHandler from './_routes/payments/webhook.js';
 import verifyPaymentHandler from './_routes/payments/verify.js';
@@ -49,6 +50,7 @@ const routes: Record<string, (req: any, res: any) => Promise<any> | any> = {
   'messages/unlock-contact': unlockContactHandler,
   'wallet/balance': balanceHandler,
   'wallet/transactions': transactionsHandler,
+  'wallet/withdraw': withdrawHandler,
   'payments/initialize': initPaymentHandler,
   'payments/webhook': webhookHandler,
   'payments/verify': verifyPaymentHandler,

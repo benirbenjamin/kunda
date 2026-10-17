@@ -41,6 +41,19 @@ export function getErrorMessage(error: any): string {
       if (clean.includes('FUNCTION_INVOCATION_FAILED')) {
         return 'Server execution error (FUNCTION_INVOCATION_FAILED). The serverless API encountered an issue.';
       }
+      // If server returned an HTML error document (e.g. Cloudflare / Vercel Security Checkpoint or WAF page)
+      if (
+        clean.startsWith('<!DOCTYPE') ||
+        clean.startsWith('<html') ||
+        clean.includes('<body') ||
+        clean.includes('data-astro-cid') ||
+        clean.includes('Security Checkpoint')
+      ) {
+        if (error.response?.status === 403) {
+          return 'Access temporarily challenged by cloud security. Please pause for 5 seconds and try again.';
+        }
+        return `Server temporarily unavailable (HTTP ${error.response?.status || 500}). Please refresh.`;
+      }
       return clean;
     }
     if (typeof errData.message === 'string' && errData.message.trim().length > 0) {

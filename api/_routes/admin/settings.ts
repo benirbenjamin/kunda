@@ -22,6 +22,11 @@ export default async function handler(req: any, res: any) {
         weeklyPassPrice: Number(memoryStore.adminSettings.get('weekly_pass_cost') ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF),
         payPerMessagePrice: Number(memoryStore.adminSettings.get('pay_per_message_cost') ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF),
         contactUnlockPrice: Number(memoryStore.adminSettings.get('contact_unlock_cost') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF),
+        welcomeBonusAmount: Number(memoryStore.adminSettings.get('welcome_bonus_amount') ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF),
+        referralSignupReward: Number(memoryStore.adminSettings.get('referral_signup_reward') ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF),
+        referralDepositCommissionPct: Number(memoryStore.adminSettings.get('referral_deposit_commission_pct') ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT),
+        contactUnlockCommissionPct: Number(memoryStore.adminSettings.get('contact_unlock_commission_pct') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT),
+        minimumWithdrawalAmount: Number(memoryStore.adminSettings.get('minimum_withdrawal_amount') ?? BUSINESS_CONFIG.MINIMUM_WITHDRAWAL_RWF),
         defaultCurrency: (memoryStore.adminSettings.get('default_currency') as string) || BUSINESS_CONFIG.DEFAULT_CURRENCY,
       }
     });
@@ -46,6 +51,11 @@ export default async function handler(req: any, res: any) {
       weeklyPassPrice: memoryStore.adminSettings.get('weekly_pass_cost') ?? BUSINESS_CONFIG.WEEKLY_PASS_PRICE_RWF,
       payPerMessagePrice: memoryStore.adminSettings.get('pay_per_message_cost') ?? BUSINESS_CONFIG.PAY_PER_MESSAGE_PRICE_RWF,
       contactUnlockPrice: memoryStore.adminSettings.get('contact_unlock_cost') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_PRICE_RWF,
+      welcomeBonusAmount: memoryStore.adminSettings.get('welcome_bonus_amount') ?? BUSINESS_CONFIG.WELCOME_BONUS_RWF,
+      referralSignupReward: memoryStore.adminSettings.get('referral_signup_reward') ?? BUSINESS_CONFIG.REFERRAL_SIGNUP_REWARD_RWF,
+      referralDepositCommissionPct: memoryStore.adminSettings.get('referral_deposit_commission_pct') ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT,
+      contactUnlockCommissionPct: memoryStore.adminSettings.get('contact_unlock_commission_pct') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT,
+      minimumWithdrawalAmount: memoryStore.adminSettings.get('minimum_withdrawal_amount') ?? BUSINESS_CONFIG.MINIMUM_WITHDRAWAL_RWF,
       defaultCurrency: memoryStore.adminSettings.get('default_currency') ?? BUSINESS_CONFIG.DEFAULT_CURRENCY,
       moderationStrictness: memoryStore.adminSettings.get('moderation_strictness') ?? 'high',
       
@@ -111,6 +121,21 @@ export default async function handler(req: any, res: any) {
     }
     if (updates.contactUnlockPrice !== undefined) {
       savePromises.push(saveAdminSettingToDb('contact_unlock_cost', parseInt(updates.contactUnlockPrice, 10)));
+    }
+    if (updates.welcomeBonusAmount !== undefined) {
+      savePromises.push(saveAdminSettingToDb('welcome_bonus_amount', parseInt(updates.welcomeBonusAmount, 10)));
+    }
+    if (updates.referralSignupReward !== undefined) {
+      savePromises.push(saveAdminSettingToDb('referral_signup_reward', parseInt(updates.referralSignupReward, 10)));
+    }
+    if (updates.referralDepositCommissionPct !== undefined) {
+      savePromises.push(saveAdminSettingToDb('referral_deposit_commission_pct', parseInt(updates.referralDepositCommissionPct, 10)));
+    }
+    if (updates.contactUnlockCommissionPct !== undefined) {
+      savePromises.push(saveAdminSettingToDb('contact_unlock_commission_pct', parseInt(updates.contactUnlockCommissionPct, 10)));
+    }
+    if (updates.minimumWithdrawalAmount !== undefined) {
+      savePromises.push(saveAdminSettingToDb('minimum_withdrawal_amount', parseInt(updates.minimumWithdrawalAmount, 10)));
     }
     if (updates.defaultCurrency !== undefined) {
       savePromises.push(saveAdminSettingToDb('default_currency', updates.defaultCurrency));

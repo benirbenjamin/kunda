@@ -2,8 +2,9 @@
 // POST /api/payments/webhook - Flutterwave Webhook Listener
 // =====================================================================
 import { verifyFlutterwaveWebhookSignature } from '../../_lib/flutterwave.js';
-import { creditWallet } from '../../_lib/wallet.js';
-import { memoryStore } from '../../_lib/db.js';
+import { creditWallet, creditDepositCommission } from '../../_lib/wallet.js';
+import { memoryStore, loadAdminSettingsFromDb } from '../../_lib/db.js';
+import { BUSINESS_CONFIG } from '../../_lib/config.js';
 import crypto from 'crypto';
 
 export default async function handler(req: any, res: any) {
@@ -44,6 +45,17 @@ export default async function handler(req: any, res: any) {
       txRef,
       txRef // Idempotency key
     );
+
+    // Referral deposit commission
+    if ((user as any).referredBy) {
+      await loadAdminSettingsFromDb().catch(() => {});
+      const commPct = Number(
+        memoryStore.adminSettings.get('referral_deposit_commission_pct') ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT
+      );
+      await creditDepositCommission((user as any).referredBy, amount, commPct).catch((err) =>
+        console.warn('Webhook referral deposit commission warning:', err)
+      );
+    }
 
     // Send notification
     memoryStore.notifications.unshift({

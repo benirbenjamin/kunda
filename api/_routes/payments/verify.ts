@@ -2,9 +2,10 @@
 // POST /api/payments/verify - Verify Payment & Credit Wallet
 // =====================================================================
 import { extractAuthUser } from '../../_lib/auth.js';
-import { creditWallet, getWalletBalance } from '../../_lib/wallet.js';
+import { creditWallet, getWalletBalance, creditDepositCommission } from '../../_lib/wallet.js';
 import { verifyPaymentWithFlutterwave } from '../../_lib/flutterwave.js';
-import { memoryStore } from '../../_lib/db.js';
+import { memoryStore, loadAdminSettingsFromDb } from '../../_lib/db.js';
+import { BUSINESS_CONFIG } from '../../_lib/config.js';
 import crypto from 'crypto';
 
 export default async function handler(req: any, res: any) {
@@ -51,7 +52,19 @@ export default async function handler(req: any, res: any) {
     txRef
   );
 
-  // 3. In-App Notification
+  // 3. Referral Deposit Commission (5% earned by the member who invited them)
+  const depositingUser: any = memoryStore.users.find((u) => u.id === auth.userId);
+  if (depositingUser?.referredBy) {
+    await loadAdminSettingsFromDb().catch(() => {});
+    const commPct = Number(
+      memoryStore.adminSettings.get('referral_deposit_commission_pct') ?? BUSINESS_CONFIG.REFERRAL_DEPOSIT_COMMISSION_PCT
+    );
+    await creditDepositCommission(depositingUser.referredBy, depositAmount, commPct).catch((err) =>
+      console.warn('Referral deposit commission warning:', err)
+    );
+  }
+
+  // 4. In-App Notification
   memoryStore.notifications.unshift({
     id: crypto.randomUUID(),
     userId: auth.userId,

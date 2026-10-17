@@ -110,18 +110,18 @@ export const Subscription: React.FC = () => {
 
       {/* Available Passes */}
       {(() => {
-        const hourlyPlan = plans.find((p) => p.code === 'hourly') || { price: 500, currency: 'RWF' };
-        const threeDayPlan = plans.find((p) => p.code === 'three_day') || { price: 1500, currency: 'RWF' };
-        const weeklyPlan = plans.find((p) => p.code === 'weekly') || { price: 3000, currency: 'RWF' };
+        const hourlyPlan = plans.find((p) => p.code === 'hourly' || p.code === 'daily') || { price: 1500, currency: 'RWF' };
+        const threeDayPlan = plans.find((p) => p.code === 'three_day') || { price: 3000, currency: 'RWF' };
+        const weeklyPlan = plans.find((p) => p.code === 'weekly') || { price: 5000, currency: 'RWF' };
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Hourly / 24h Pass */}
+            {/* 24-Hour Pass */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card flex flex-col justify-between space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">
-                    Hourly / 24h Pass
+                    24-Hour Pass (Daily)
                   </span>
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold">
                     Quick Boost
@@ -149,7 +149,7 @@ export const Subscription: React.FC = () => {
                 loading={submitting}
                 className="w-full text-xs"
               >
-                Activate Hourly Pass ({hourlyPlan.price.toLocaleString()} {hourlyPlan.currency})
+                Activate 24-Hour Pass ({hourlyPlan.price.toLocaleString()} {hourlyPlan.currency})
               </Button>
             </div>
 

@@ -4,6 +4,7 @@ import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { WalletProvider } from './contexts/WalletContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { PwaProvider } from './contexts/PwaContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { BottomNav } from './components/layout/BottomNav';
@@ -15,6 +16,7 @@ import { HowItWorks } from './pages/public/HowItWorks';
 import { MembershipPlans } from './pages/public/MembershipPlans';
 import { SafetyCenter } from './pages/public/SafetyCenter';
 import { Faq } from './pages/public/Faq';
+import { MakeMoney } from './pages/public/MakeMoney';
 import { Terms, Privacy, CommunityGuidelines, Contact } from './pages/public/LegalPages';
 
 // Auth Pages
@@ -30,6 +32,7 @@ import { Feed } from './pages/dashboard/Feed';
 import { Matches } from './pages/dashboard/Matches';
 import { Messages } from './pages/dashboard/Messages';
 import { Wallet } from './pages/dashboard/Wallet';
+import { Referrals } from './pages/dashboard/Referrals';
 import { Subscription } from './pages/dashboard/Subscription';
 import { Profile } from './pages/dashboard/Profile';
 import { Settings } from './pages/dashboard/Settings';
@@ -92,7 +95,9 @@ export const AppContent: React.FC = () => {
           {/* Public Website Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/about" element={<HowItWorks />} />
           <Route path="/membership" element={<MembershipPlans />} />
+          <Route path="/make-money" element={<MakeMoney />} />
           <Route path="/safety" element={<SafetyCenter />} />
           <Route path="/faq" element={<Faq />} />
           <Route path="/terms" element={<Terms />} />
@@ -103,11 +108,15 @@ export const AppContent: React.FC = () => {
           {/* Multilingual SEO Alias Routes */}
           <Route path="/:lang/" element={<Home />} />
           <Route path="/:lang/how-it-works" element={<HowItWorks />} />
+          <Route path="/:lang/about" element={<HowItWorks />} />
           <Route path="/:lang/uko-bikora" element={<HowItWorks />} />
           <Route path="/:lang/comment-ca-marche" element={<HowItWorks />} />
           <Route path="/:lang/membership" element={<MembershipPlans />} />
           <Route path="/:lang/ibiciro" element={<MembershipPlans />} />
           <Route path="/:lang/abonnements" element={<MembershipPlans />} />
+          <Route path="/:lang/make-money" element={<MakeMoney />} />
+          <Route path="/:lang/gushaka-amafaranga" element={<MakeMoney />} />
+          <Route path="/:lang/gagner-de-largent" element={<MakeMoney />} />
           <Route path="/:lang/safety" element={<SafetyCenter />} />
           <Route path="/:lang/faq" element={<Faq />} />
 
@@ -156,6 +165,14 @@ export const AppContent: React.FC = () => {
             element={
               <ProtectedRoute>
                 <Wallet />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/referrals"
+            element={
+              <ProtectedRoute>
+                <Referrals />
               </ProtectedRoute>
             }
           />
@@ -214,7 +231,9 @@ export default function App() {
           <AuthProvider>
             <WalletProvider>
               <NotificationProvider>
-                <AppContent />
+                <PwaProvider>
+                  <AppContent />
+                </PwaProvider>
               </NotificationProvider>
             </WalletProvider>
           </AuthProvider>

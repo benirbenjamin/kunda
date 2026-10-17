@@ -56,6 +56,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initialLoadDoneRef = useRef<boolean>(false);
   const toastTimeoutRef = useRef<any>(null);
+  const isFetchingRef = useRef<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const backoffUntilRef = useRef<number>(0);
 
   const setSoundEnabled = (enabled: boolean) => {
     setSoundEnabledState(enabled);
@@ -161,9 +164,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const refreshNotifications = async () => {
     if (!token) return;
+    if (isFetchingRef.current) return;
+    if (Date.now() < backoffUntilRef.current) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+
+    isFetchingRef.current = true;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
-      const res = await api.get('/notifications');
-      if (res.data.success && Array.isArray(res.data.notifications)) {
+      const res = await api.get('/notifications', { signal: controller.signal });
+      if (res.data?.success && Array.isArray(res.data.notifications)) {
         const fetched: NotificationItem[] = res.data.notifications;
         setNotifications(fetched);
 
@@ -182,8 +194,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           }
         }
       }
-    } catch (err) {
-      console.error('Notification fetch error:', err);
+    } catch (err: any) {
+      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
+        // Ignored: request intentionally timed out or aborted
+      } else {
+        const status = err?.response?.status;
+        if (status === 403 || status === 429) {
+          // Rate-limited or challenged: back off for 30 seconds
+          backoffUntilRef.current = Date.now() + 30000;
+        }
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      isFetchingRef.current = false;
+      abortControllerRef.current = null;
     }
   };
 
@@ -194,13 +218,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (Notification.permission === 'default') {
           setTimeout(() => {
             requestPushPermission();
-          }, 2000);
+          }, 3000);
         }
       }
 
       refreshNotifications();
-      const interval = setInterval(refreshNotifications, 5000); // 5s fast polling for real-time responsiveness
-      return () => clearInterval(interval);
+      const interval = setInterval(refreshNotifications, 15000); // 15s gentle polling
+      return () => {
+        clearInterval(interval);
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
     } else {
       initialLoadDoneRef.current = false;
       seenIdsRef.current.clear();

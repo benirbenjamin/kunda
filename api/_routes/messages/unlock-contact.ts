@@ -4,7 +4,7 @@
 import crypto from 'crypto';
 import { extractAuthUser } from '../../_lib/auth.js';
 import { memoryStore, loadAdminSettingsFromDb, query } from '../../_lib/db.js';
-import { debitWallet, getWalletBalance } from '../../_lib/wallet.js';
+import { debitWallet, getWalletBalance, creditUnlockCommission } from '../../_lib/wallet.js';
 import { BUSINESS_CONFIG } from '../../_lib/config.js';
 
 export default async function handler(req: any, res: any) {
@@ -107,7 +107,15 @@ export default async function handler(req: any, res: any) {
 
   memoryStore.contactUnlocks.push(unlockRecord);
 
-  // 5. Notify target user that their contact was unlocked with their consent
+  // 5. Credit 15% (or configured %) revenue share to the target user whose contact was unlocked (withdrawable!)
+  const unlockCommissionPct = Number(
+    memoryStore.adminSettings.get('contact_unlock_commission_pct') ?? BUSINESS_CONFIG.CONTACT_UNLOCK_COMMISSION_PCT
+  );
+  await creditUnlockCommission(targetUserId, unlockCost, unlockCommissionPct).catch((err) =>
+    console.warn('Unlock commission credit warning:', err)
+  );
+
+  // 6. Notify target user that their contact was unlocked with their consent
   const requesterProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
   memoryStore.notifications.unshift({
     id: crypto.randomUUID(),

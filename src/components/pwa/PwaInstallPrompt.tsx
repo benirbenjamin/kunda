@@ -1,53 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Download, X, Smartphone, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, X, Smartphone } from 'lucide-react';
+import { usePwa } from '../../contexts/PwaContext';
 
 export const PwaInstallPrompt: React.FC = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const { isInstalled, installApp } = usePwa();
   const [isDismissed, setIsDismissed] = useState<boolean>(() => {
     return sessionStorage.getItem('kunda_pwa_dismissed') === 'true';
   });
-  const [isInstalled, setIsInstalled] = useState<boolean>(false);
-
-  useEffect(() => {
-    // Detect if already installed / running in standalone mode
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
-      setIsInstalled(true);
-      return;
-    }
-
-    const handler = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-
-    window.addEventListener('appinstalled', () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-    });
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-    };
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsInstalled(true);
-    }
-    setDeferredPrompt(null);
-  };
 
   const handleDismiss = () => {
     setIsDismissed(true);
     sessionStorage.setItem('kunda_pwa_dismissed', 'true');
   };
 
-  if (isInstalled || isDismissed || !deferredPrompt) {
+  if (isInstalled || isDismissed) {
     return null;
   }
 
@@ -75,7 +41,7 @@ export const PwaInstallPrompt: React.FC = () => {
 
           <div className="flex items-center gap-2 mt-3">
             <button
-              onClick={handleInstallClick}
+              onClick={installApp}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs font-medium rounded-xl shadow-sm transition-all"
             >
               <Download className="w-3.5 h-3.5" />

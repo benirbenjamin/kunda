@@ -53,6 +53,7 @@ export const Messages: React.FC = () => {
   const [sending, setSending] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+  const [selectedMessageForInfo, setSelectedMessageForInfo] = useState<any | null>(null);
 
   // Message Reactions Map: messageId -> reaction emoji string (e.g. '❤️')
   const [reactions, setReactions] = useState<Record<string, string>>({});
@@ -329,8 +330,8 @@ export const Messages: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-6 pb-24 md:pb-12">
-      {/* Messaging Header Pill: Dynamic Allowance & Wallet Status */}
-      <div className="mb-4 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Messaging Header Pill: Dynamic Allowance & Wallet Status (Hidden on mobile when chat active to maximize screen fit) */}
+      <div className={`mb-3 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${selectedPartnerId ? 'hidden md:flex' : 'flex'}`}>
         <div className="flex flex-wrap items-center gap-2">
           {allowanceState.hasActiveSubscription ? (
             <Badge variant="violet" className="font-bold flex items-center gap-1.5 py-1 px-3">
@@ -359,8 +360,8 @@ export const Messages: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Instagram-like Chat Container */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-card overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[640px] h-[75vh]">
+      {/* Main WhatsApp-Style Screen-Fitting Chat Container */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-card overflow-hidden grid grid-cols-1 md:grid-cols-12 h-[calc(100dvh-75px)] md:h-[calc(100vh-140px)] min-h-[500px]">
         {/* LEFT COLUMN: Instagram Conversation List (Hidden on mobile when chat is active) */}
         <div
           className={`md:col-span-4 border-r border-slate-100 flex flex-col h-full ${
@@ -558,13 +559,13 @@ export const Messages: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* Instagram Direct Top Header */}
-              <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md sticky top-0 z-10 shadow-xs">
+              {/* WhatsApp Style Top Header */}
+              <div className="p-3 sm:p-3.5 border-b border-slate-200 bg-[#f0f2f5] flex items-center justify-between shrink-0 shadow-xs">
                 <div className="flex items-center gap-2.5 sm:gap-3">
                   {/* Mobile Back Button */}
                   <button
                     onClick={() => setSelectedPartnerId(null)}
-                    className="md:hidden p-1.5 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-full"
+                    className="md:hidden p-1.5 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-full"
                     title="Back to conversations"
                   >
                     <ChevronLeft className="w-5 h-5" />
@@ -574,37 +575,43 @@ export const Messages: React.FC = () => {
                     <img
                       src={activePartnerData?.partnerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
                       alt={partnerDisplayName}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                      className="w-10 h-10 rounded-full object-cover border border-slate-300"
                     />
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0 animate-pulse" />
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <h3 className="text-sm font-bold text-[#111b21] flex items-center gap-1.5">
                       <span>{partnerDisplayName}</span>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-rose-500" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                     </h3>
                     <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Active now • {activePartnerData?.partnerCity || 'Rwanda'}
+                      online • {activePartnerData?.partnerCity || 'Rwanda'}
                     </span>
                   </div>
                 </div>
 
-                {/* Direct Contact Phone Unlock Button */}
-                <div>
+                {/* Direct Contact Phone Unlock Button / WhatsApp Link */}
+                <div className="flex items-center gap-2">
                   {unlockedPhone ? (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 shadow-xs">
+                    <a
+                      href={`https://wa.me/${unlockedPhone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold shadow-xs transition-colors"
+                      title="Open chat in WhatsApp"
+                    >
                       <Phone className="w-3.5 h-3.5" />
                       <span>{unlockedPhone}</span>
-                    </div>
+                    </a>
                   ) : (
                     <button
                       onClick={() => setUnlockModalOpen(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all shadow-xs"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all shadow-xs"
                       title="Unlock member direct telephone number"
                     >
-                      <Lock className="w-3.5 h-3.5 text-rose-600" />
+                      <Lock className="w-3.5 h-3.5 text-emerald-700" />
                       <span>Unlock Phone ({contactUnlockPrice.toLocaleString()} RWF)</span>
                     </button>
                   )}
@@ -613,39 +620,52 @@ export const Messages: React.FC = () => {
 
               {/* Moderation Alert Banner */}
               {moderationWarning && (
-                <div className="m-3 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in">
+                <div className="m-2 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <span className="font-bold">{moderationWarning.reason}</span>
                     <p className="text-[11px] text-amber-800">{moderationWarning.safeSuggestion}</p>
                   </div>
                 </div>
               )}
 
-              {/* Instagram Message Stream */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gradient-to-b from-slate-50/40 to-white">
+              {/* WhatsApp Message Stream with Beige Background & Smooth Upward Scroll */}
+              <div
+                className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-2.5 bg-[#efeae2]"
+                style={{
+                  backgroundImage: 'radial-gradient(#e0d6c9 1px, transparent 1px)',
+                  backgroundSize: '16px 16px',
+                }}
+              >
+                {/* Date separator */}
+                <div className="flex justify-center my-1">
+                  <span className="bg-white/90 text-slate-600 text-[10px] font-bold px-3 py-0.5 rounded-lg shadow-xs uppercase tracking-wider">
+                    Today
+                  </span>
+                </div>
+
                 {loadingMessages ? (
-                  <div className="text-center py-16 text-slate-400 text-xs animate-pulse">
-                    Loading conversation...
+                  <div className="text-center py-16 text-slate-500 text-xs animate-pulse">
+                    Loading WhatsApp messages...
                   </div>
                 ) : messages.length === 0 ? (
-                  <div className="text-center py-16 px-4 space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto shadow-sm">
-                      <Heart className="w-8 h-8 fill-rose-500/20" />
+                  <div className="text-center py-12 px-4 space-y-3">
+                    <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-sm">
+                      <MessageCircle className="w-7 h-7" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-slate-800">You connected with {partnerDisplayName}!</h4>
+                      <h4 className="text-sm font-bold text-slate-800">Chat with {partnerDisplayName}</h4>
                       <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                        Say hello respectfully! Compliment something from their profile or ask about their favorite hobbies.
+                        Messages are end-to-end moderated for mutual safety. Start the conversation with a warm greeting!
                       </p>
                     </div>
                     {/* Quick Starters */}
-                    <div className="flex flex-wrap justify-center gap-2 pt-2">
-                      {['Muraho neza 👋', 'Loved your bio! ✨', 'How is your week going? ☕', 'What is your favorite spot in town? 🌿'].map((starter) => (
+                    <div className="flex flex-wrap justify-center gap-2 pt-1">
+                      {['Muraho neza 👋', 'Loved your bio! ✨', 'How is your week going? ☕', 'What is your favorite spot in Kigali? 🌿'].map((starter) => (
                         <button
                           key={starter}
                           onClick={() => handleSendMessage(starter)}
-                          className="px-3 py-1 rounded-full text-xs font-semibold bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 transition-colors shadow-xs"
+                          className="px-3 py-1 rounded-full text-xs font-semibold bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 transition-colors shadow-xs"
                         >
                           {starter}
                         </button>
@@ -663,35 +683,57 @@ export const Messages: React.FC = () => {
                         key={m.id}
                         className={`flex flex-col group relative ${isMine ? 'items-end' : 'items-start'}`}
                       >
-                        {/* Message Bubble */}
+                        {/* WhatsApp Message Bubble */}
                         <div
+                          onClick={() => setSelectedMessageForInfo(m)}
                           onDoubleClick={() => handleMessageDoubleTap(m.id)}
-                          className={`relative max-w-[80%] sm:max-w-[70%] px-4 py-2.5 text-xs sm:text-sm select-none cursor-pointer transition-transform ${
+                          title="Click to view message delivered & read time"
+                          className={`relative max-w-[85%] sm:max-w-[70%] px-3.5 py-2 text-xs sm:text-sm select-none cursor-pointer transition-all hover:brightness-95 ${
                             isMine
-                              ? 'bg-gradient-to-r from-rose-500 via-rose-600 to-violet-600 text-white rounded-3xl rounded-br-xs shadow-sm shadow-rose-200'
-                              : 'bg-slate-100 text-slate-900 rounded-3xl rounded-bl-xs hover:bg-slate-200/80'
+                              ? 'bg-[#d9fdd3] text-[#111b21] rounded-2xl rounded-tr-xs shadow-xs'
+                              : 'bg-white text-[#111b21] rounded-2xl rounded-tl-xs shadow-xs'
                           }`}
                         >
-                          {m.content}
+                          <div className="pr-12 pb-1 break-words">{m.content}</div>
 
-                          {/* Instagram Double Tap Floating Heart Animation */}
+                          {/* WhatsApp Timestamp & Delivery Status Checkmarks */}
+                          <div className="absolute bottom-1 right-2 flex items-center gap-1 select-none pointer-events-none">
+                            <span className="text-[10px] text-slate-500">
+                              {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {isMine && (
+                              <span>
+                                {m.isRead ? (
+                                  <span title="Read / Seen">
+                                    <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />
+                                  </span>
+                                ) : (
+                                  <span title="Delivered">
+                                    <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Floating Heart Animation on Double Tap */}
                           {isHeartAnimating && (
                             <span className="absolute inset-0 flex items-center justify-center pointer-events-none animate-ping">
-                              <Heart className="w-10 h-10 text-white fill-white drop-shadow-md" />
+                              <Heart className="w-8 h-8 text-rose-500 fill-rose-500 drop-shadow-md" />
                             </span>
                           )}
 
                           {/* Reaction Pill Badge */}
                           {hasReaction && (
-                            <span className="absolute -bottom-2.5 right-2 bg-white rounded-full px-1.5 py-0.5 text-xs border border-slate-200 shadow-sm animate-in zoom-in-75">
+                            <span className="absolute -bottom-2 right-2 bg-white rounded-full px-1.5 py-0.5 text-xs border border-slate-200 shadow-xs animate-in zoom-in-75">
                               {hasReaction}
                             </span>
                           )}
                         </div>
 
-                        {/* Quick Reaction Bar on Hover (Instagram Style) */}
+                        {/* Quick Reaction Bar on Hover */}
                         <div
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1 px-1 bg-white border border-slate-100 rounded-full shadow-xs py-0.5 z-10 ${
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-0.5 px-1 bg-white border border-slate-200 rounded-full shadow-xs py-0.5 z-10 ${
                             isMine ? 'justify-end' : 'justify-start'
                           }`}
                         >
@@ -705,26 +747,14 @@ export const Messages: React.FC = () => {
                               {emoji}
                             </button>
                           ))}
-                        </div>
-
-                        {/* Timestamp and delivery checkmark */}
-                        <div className="flex items-center gap-1 text-[9px] text-slate-400 mt-0.5 px-2">
-                          <span>
-                            {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {isMine && (
-                            <span>
-                              {m.isRead ? (
-                                <span title="Seen">
-                                  <CheckCheck className="w-3 h-3 text-rose-500" />
-                                </span>
-                              ) : (
-                                <span title="Delivered">
-                                  <Check className="w-3 h-3 text-slate-400" />
-                                </span>
-                              )}
-                            </span>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMessageForInfo(m)}
+                            className="text-[10px] text-slate-500 hover:text-slate-800 px-1 border-l border-slate-200 ml-0.5"
+                            title="Message Info"
+                          >
+                            Info
+                          </button>
                         </div>
                       </div>
                     );
@@ -733,10 +763,10 @@ export const Messages: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Quick Emoji Picker Tray (Instagram DM style) */}
+              {/* Quick Emoji Picker Tray */}
               {showEmojiPicker && (
-                <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1">Quick:</span>
+                <div className="p-2.5 bg-[#f0f2f5] border-t border-slate-200 flex items-center gap-2 overflow-x-auto shrink-0">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider pl-1">Emojis:</span>
                   {QUICK_EMOJIS.map((emoji) => (
                     <button
                       key={emoji}
@@ -750,20 +780,20 @@ export const Messages: React.FC = () => {
                 </div>
               )}
 
-              {/* Instagram Style Bottom Message Bar */}
+              {/* WhatsApp Style Bottom Message Bar (Pinned to Screen Bottom) */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSendMessage();
                 }}
-                className="p-3 border-t border-slate-100 flex items-center gap-2 bg-white"
+                className="p-2.5 sm:p-3 border-t border-slate-200 flex items-center gap-2 bg-[#f0f2f5] shrink-0"
               >
                 {/* Emoji toggle icon */}
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   className={`p-2 rounded-full transition-colors ${
-                    showEmojiPicker ? 'bg-rose-50 text-rose-600' : 'text-slate-400 hover:text-slate-600'
+                    showEmojiPicker ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-500 hover:text-slate-700'
                   }`}
                   title="Insert emoji"
                 >
@@ -775,34 +805,79 @@ export const Messages: React.FC = () => {
                   type="text"
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder={`Message ${partnerDisplayName}...`}
-                  className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-full border border-slate-200 bg-slate-50 text-slate-900 focus:bg-white focus:outline-none focus:border-rose-500 transition-colors"
+                  placeholder={`Type a message for ${partnerDisplayName}...`}
+                  className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-full border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors shadow-2xs"
                 />
 
-                {/* If text is typed, show Send button. If empty, show instant Heart button (Instagram DM style!) */}
-                {messageInput.trim() ? (
-                  <button
-                    type="submit"
-                    disabled={sending}
-                    className="p-2.5 rounded-full bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-md shadow-rose-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage('❤️')}
-                    className="p-2 rounded-full text-rose-500 hover:scale-125 active:scale-95 transition-all"
-                    title="Send instant ❤️ heart"
-                  >
-                    <Heart className="w-6 h-6 fill-rose-500" />
-                  </button>
-                )}
+                {/* WhatsApp Green Send Button */}
+                <button
+                  type="submit"
+                  disabled={sending || !messageInput.trim()}
+                  className="w-10 h-10 rounded-full bg-[#00a884] hover:bg-[#008f6f] disabled:opacity-50 text-white flex items-center justify-center shrink-0 shadow-md active:scale-95 transition-all"
+                  title="Send message"
+                >
+                  <Send className="w-4 h-4 ml-0.5" />
+                </button>
               </form>
             </>
           )}
         </div>
       </div>
+
+      {/* WhatsApp Message Info Modal */}
+      {selectedMessageForInfo && (
+        <Modal
+          isOpen={Boolean(selectedMessageForInfo)}
+          onClose={() => setSelectedMessageForInfo(null)}
+          title="Message Info"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-[#d9fdd3] text-[#111b21] rounded-2xl shadow-xs text-xs sm:text-sm font-medium border border-emerald-200">
+              {selectedMessageForInfo.content}
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 divide-y divide-slate-200 text-xs">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="font-semibold text-slate-800 flex items-center gap-2">
+                  <CheckCheck className="w-4 h-4 text-[#53bdeb]" /> Read / Seen
+                </span>
+                <span className="text-slate-500 font-medium text-[11px]">
+                  {selectedMessageForInfo.isRead
+                    ? new Date(selectedMessageForInfo.createdAt).toLocaleString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'Not read yet'}
+                </span>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="font-semibold text-slate-800 flex items-center gap-2">
+                  <CheckCheck className="w-4 h-4 text-slate-400" /> Delivered
+                </span>
+                <span className="text-slate-500 font-medium text-[11px]">
+                  {new Date(selectedMessageForInfo.createdAt).toLocaleString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => setSelectedMessageForInfo(null)}
+              className="w-full text-xs"
+            >
+              Close
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {/* Direct Contact Unlock Modal */}
       <Modal

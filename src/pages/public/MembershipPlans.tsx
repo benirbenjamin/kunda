@@ -21,9 +21,9 @@ export const MembershipPlans: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const hourlyPlan = plans.find((p) => p.code === 'hourly') || { price: 500, currency: 'RWF' };
-  const threeDayPlan = plans.find((p) => p.code === 'three_day') || { price: 1500, currency: 'RWF' };
-  const weeklyPlan = plans.find((p) => p.code === 'weekly') || { price: 3000, currency: 'RWF' };
+  const hourlyPlan = plans.find((p) => p.code === 'hourly' || p.code === 'daily') || { price: 1500, currency: 'RWF' };
+  const threeDayPlan = plans.find((p) => p.code === 'three_day') || { price: 3000, currency: 'RWF' };
+  const weeklyPlan = plans.find((p) => p.code === 'weekly') || { price: 5000, currency: 'RWF' };
   const payPerMsgPlan = plans.find((p) => p.code === 'pay_per_message') || { price: 150, currency: 'RWF' };
   const contactUnlockPlan = plans.find((p) => p.code === 'contact_unlock') || { price: 2000, currency: 'RWF' };
 
@@ -75,10 +75,10 @@ export const MembershipPlans: React.FC = () => {
           </Link>
         </div>
 
-        {/* Hourly / 24h Pass */}
+        {/* 24-Hour Pass */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between space-y-6">
           <div className="space-y-4">
-            <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Hourly / 24h Pass</span>
+            <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">24-Hour Pass (Daily)</span>
             <div className="text-3xl font-black text-slate-900">{hourlyPlan.price.toLocaleString()} {hourlyPlan.currency}</div>
             <p className="text-xs text-slate-600">Quick connection boost for fast interactions and spontaneous dates.</p>
             <div className="pt-4 border-t border-slate-100 space-y-2.5">
@@ -98,7 +98,7 @@ export const MembershipPlans: React.FC = () => {
           </div>
           <Link to="/auth/register">
             <Button variant="outline" className="w-full text-xs">
-              Select Hourly Pass
+              Select 24-Hour Pass
             </Button>
           </Link>
         </div>

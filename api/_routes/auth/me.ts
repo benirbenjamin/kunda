@@ -61,6 +61,7 @@ export default async function handler(req: any, res: any) {
       phone: user.phone,
       phoneCode: user.phoneCode,
       preferredLanguage: user.preferredLanguage,
+      referralCode: user.referralCode || user.id.replace(/-/g, '').slice(0, 8).toUpperCase(),
     },
     profile,
     wallet,

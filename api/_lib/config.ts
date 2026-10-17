@@ -9,11 +9,18 @@ export const BUSINESS_CONFIG = {
   FREE_REPLIES_ALLOWED: 3,
 
   // Costs (in minor units: 1 RWF = 1 unit or cents)
-  HOURLY_PASS_PRICE_RWF: 500,
-  THREE_DAY_PASS_PRICE_RWF: 1500,
-  WEEKLY_PASS_PRICE_RWF: 3000,
+  HOURLY_PASS_PRICE_RWF: 1500, // 24-Hour Pass (Daily)
+  THREE_DAY_PASS_PRICE_RWF: 3000,
+  WEEKLY_PASS_PRICE_RWF: 5000,
   PAY_PER_MESSAGE_PRICE_RWF: 150,
   CONTACT_UNLOCK_PRICE_RWF: 2000,
+
+  // Earning & Affiliate Rewards
+  WELCOME_BONUS_RWF: 500, // Credited to welcome bonus wallet on signup (spendable, non-withdrawable)
+  REFERRAL_SIGNUP_REWARD_RWF: 200, // Credited to withdrawable balance when referred friend registers
+  REFERRAL_DEPOSIT_COMMISSION_PCT: 5, // 5% of all deposits made by referred users
+  CONTACT_UNLOCK_COMMISSION_PCT: 15, // 15% revenue share when contact is unlocked
+  MINIMUM_WITHDRAWAL_RWF: 2000, // Minimum threshold to withdraw to MoMo / Airtel / Bank
 
   DEFAULT_CURRENCY: 'RWF',
 

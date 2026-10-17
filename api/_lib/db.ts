@@ -82,7 +82,7 @@ export const memoryStore = {
   conversations: [] as any[],
   messages: [] as any[],
   allowances: new Map<string, { initialRemaining: number; distinctRecipients: string[]; repliesRemaining: number }>(),
-  wallets: new Map<string, { balanceMinor: number; currency: string }>(),
+  wallets: new Map<string, any>(),
   transactions: [] as any[],
   subscriptions: [] as any[],
   contactUnlocks: [] as any[],
@@ -95,6 +95,7 @@ export const memoryStore = {
   posts: [] as any[],
   postComments: [] as any[],
   postLikes: [] as any[],
+  withdrawals: [] as any[],
 };
 
 // Seed initial memory store with admin and realistic member profiles
@@ -150,11 +151,16 @@ function initMemoryStore() {
   memoryStore.adminSettings.set('free_initial_messages', 3);
   memoryStore.adminSettings.set('free_distinct_recipients', 3);
   memoryStore.adminSettings.set('free_replies', 3);
-  memoryStore.adminSettings.set('hourly_pass_cost', 500);
-  memoryStore.adminSettings.set('three_day_pass_cost', 1500);
-  memoryStore.adminSettings.set('weekly_pass_cost', 3000);
+  memoryStore.adminSettings.set('hourly_pass_cost', 1500); // 24-Hour Pass
+  memoryStore.adminSettings.set('three_day_pass_cost', 3000); // 3-Day Pass
+  memoryStore.adminSettings.set('weekly_pass_cost', 5000); // Weekly Pass
   memoryStore.adminSettings.set('pay_per_message_cost', 150);
   memoryStore.adminSettings.set('contact_unlock_cost', 2000);
+  memoryStore.adminSettings.set('welcome_bonus_amount', 500);
+  memoryStore.adminSettings.set('referral_signup_reward', 200);
+  memoryStore.adminSettings.set('referral_deposit_commission_pct', 5);
+  memoryStore.adminSettings.set('contact_unlock_commission_pct', 15);
+  memoryStore.adminSettings.set('minimum_withdrawal_amount', 2000);
   memoryStore.adminSettings.set('default_currency', 'RWF');
 
   // Email & Google Drive Settings

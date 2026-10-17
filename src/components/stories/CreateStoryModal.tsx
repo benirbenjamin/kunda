@@ -136,14 +136,19 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
           });
         }
 
-        const uploadRes = await api.post('/upload', {
-          fileBase64: base64Payload,
-          filename: `story_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
-          mimeType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-        });
+        try {
+          const uploadRes = await api.post('/upload', {
+            fileBase64: base64Payload,
+            filename: `story_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
+            mimeType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+          });
 
-        if (uploadRes.data?.success && uploadRes.data?.url) {
-          finalMediaUrl = uploadRes.data.url;
+          if (uploadRes.data?.success && uploadRes.data?.url) {
+            finalMediaUrl = uploadRes.data.url;
+          }
+        } catch (uploadErr) {
+          console.warn('Story media upload fallback to direct dataUrl:', uploadErr);
+          finalMediaUrl = base64Payload;
         }
       }
 
@@ -166,10 +171,10 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full text-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full text-white shadow-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
             <h3 className="text-base font-bold text-white">Create 24h Story</h3>
@@ -183,7 +188,7 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           {errorMessage && (
             <div className="p-3 bg-rose-950/60 border border-rose-800/80 rounded-2xl flex items-center gap-2.5 text-xs text-rose-300">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
@@ -195,10 +200,10 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
           {!previewUrl ? (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-3xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-slate-800/40 hover:bg-slate-800/70 group"
+              className="border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-slate-800/40 hover:bg-slate-800/70 group"
             >
-              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-400 group-hover:scale-110 flex items-center justify-center mb-3 transition-transform">
-                <Upload className="w-7 h-7" />
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 group-hover:scale-110 flex items-center justify-center mb-3 transition-transform">
+                <Upload className="w-6 h-6" />
               </div>
               <p className="text-sm font-semibold text-slate-200">Select Photo or Video</p>
               <p className="text-xs text-slate-400 mt-1 max-w-xs">
@@ -210,7 +215,7 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
               </div>
             </div>
           ) : (
-            <div className="relative rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-[380px] mx-auto border border-slate-800 flex items-center justify-center">
+            <div className="relative rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-[220px] sm:max-h-[300px] mx-auto border border-slate-800 flex items-center justify-center">
               {mediaType === 'video' ? (
                 <video src={previewUrl} controls className="w-full h-full object-contain" autoPlay loop muted />
               ) : (
@@ -313,7 +318,7 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-800/40 border-t border-slate-800 flex items-center justify-between">
+        <div className="px-5 sm:px-6 py-3.5 bg-slate-800/40 border-t border-slate-800 flex items-center justify-between shrink-0">
           <button
             type="button"
             onClick={onClose}

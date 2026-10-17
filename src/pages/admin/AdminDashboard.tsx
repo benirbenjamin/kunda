@@ -496,21 +496,21 @@ export const AdminDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
               <Input
-                label="Hourly / 24h Pass (RWF)"
+                label="24-Hour Pass (Daily) (RWF)"
                 type="number"
-                value={settings.hourlyPassPrice ?? 500}
+                value={settings.hourlyPassPrice ?? 1500}
                 onChange={(e) => setSettings({ ...settings, hourlyPassPrice: e.target.value })}
               />
               <Input
                 label="3-Day Pass Price (RWF)"
                 type="number"
-                value={settings.threeDayPassPrice ?? 1500}
+                value={settings.threeDayPassPrice ?? 3000}
                 onChange={(e) => setSettings({ ...settings, threeDayPassPrice: e.target.value })}
               />
               <Input
                 label="Weekly Pass Price (RWF)"
                 type="number"
-                value={settings.weeklyPassPrice ?? 3000}
+                value={settings.weeklyPassPrice ?? 5000}
                 onChange={(e) => setSettings({ ...settings, weeklyPassPrice: e.target.value })}
               />
             </div>

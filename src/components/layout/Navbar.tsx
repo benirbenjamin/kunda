@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useWallet } from '../../contexts/WalletContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { usePwa } from '../../contexts/PwaContext';
 import { Button } from '../ui/Button';
 import {
   Heart,
@@ -20,17 +21,22 @@ import {
   Volume2,
   VolumeX,
   Flame,
+  Download,
+  Sparkles,
+  CheckCheck,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { language, setLanguage, t, availableLanguages } = useLanguage();
   const { balance } = useWallet();
-  const { unreadCount, soundEnabled, setSoundEnabled } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, soundEnabled, setSoundEnabled } = useNotifications();
+  const { isInstalled, installApp } = usePwa();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const [notifTrayOpen, setNotifTrayOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -77,6 +83,15 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   {t('nav.howItWorks')}
+                </Link>
+                <Link
+                  to="/make-money"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                    isActive('/make-money') ? 'text-amber-700 bg-amber-50' : 'text-amber-600 hover:text-amber-700'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Earn Money</span>
                 </Link>
                 <Link
                   to="/membership"
@@ -160,6 +175,17 @@ export const Navbar: React.FC = () => {
                   <Wallet className="w-4 h-4" />
                   <span>{balance.toLocaleString()} RWF</span>
                 </Link>
+                <Link
+                  to="/dashboard/referrals"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                    isActive('/dashboard/referrals')
+                      ? 'text-amber-800 bg-amber-50 ring-1 ring-amber-300'
+                      : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50/50'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Earn</span>
+                </Link>
                 {isAdmin && (
                   <Link
                     to="/admin"
@@ -173,8 +199,97 @@ export const Navbar: React.FC = () => {
             )}
           </nav>
 
-          {/* Right actions: Lang switcher + Sound toggle + Auth buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Right actions: Notifications Bell + Install PWA + Lang + Auth */}
+          <div className="hidden md:flex items-center gap-2.5">
+            {/* Install App Button (Visible only when not already installed!) */}
+            {!isInstalled && (
+              <button
+                onClick={installApp}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all shadow-xs"
+                title="Install Kunda Space as App"
+              >
+                <Download className="w-3.5 h-3.5 text-rose-600" />
+                <span>Install App</span>
+              </button>
+            )}
+
+            {/* In-App Notification Bell with Dropdown Tray */}
+            {isAuthenticated && (
+              <div className="relative">
+                <button
+                  onClick={() => setNotifTrayOpen(!notifTrayOpen)}
+                  className="relative p-2 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                  title="Notifications"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Interactive Notification Popover Drawer */}
+                {notifTrayOpen && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3 px-3 z-50 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-900">Notifications</span>
+                        {unreadCount > 0 && (
+                          <span className="text-[10px] bg-rose-100 text-rose-600 font-bold px-1.5 py-0.5 rounded-full">
+                            {unreadCount} new
+                          </span>
+                        )}
+                      </div>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={() => markAllAsRead()}
+                          className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto space-y-1.5 divide-y divide-slate-50">
+                      {notifications.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 text-xs">
+                          No notifications yet
+                        </div>
+                      ) : (
+                        notifications.slice(0, 15).map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              markAsRead(n.id);
+                              setNotifTrayOpen(false);
+                              if (n.linkUrl) navigate(n.linkUrl);
+                            }}
+                            className={`p-2.5 rounded-xl cursor-pointer transition-colors text-left flex items-start gap-2.5 ${
+                              !n.isRead ? 'bg-rose-50/70 hover:bg-rose-50' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                              <Bell className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-900 truncate">{n.title}</span>
+                                <span className="text-[10px] text-slate-400">
+                                  {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 line-clamp-2 mt-0.5">{n.body}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Sound alert toggle */}
             {isAuthenticated && (
               <button
@@ -250,8 +365,33 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center gap-2">
+          {/* Mobile Top Actions: Bell + Menu Button */}
+          <div className="md:hidden flex items-center gap-1.5">
+            {isAuthenticated && (
+              <button
+                onClick={() => setNotifTrayOpen(!notifTrayOpen)}
+                className="relative p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100"
+                title="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {!isInstalled && (
+              <button
+                onClick={installApp}
+                className="p-2 text-rose-600 bg-rose-50 rounded-xl text-xs font-bold flex items-center gap-1"
+                title="Install App"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100"
@@ -262,9 +402,69 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile Notification Popover Drawer */}
+      {notifTrayOpen && (
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 shadow-lg z-50 animate-in fade-in">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+            <span className="text-xs font-bold text-slate-900">Notifications ({unreadCount})</span>
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markAllAsRead()}
+                className="text-[11px] text-rose-600 font-semibold flex items-center gap-1"
+              >
+                <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-60 overflow-y-auto space-y-1">
+            {notifications.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs">No notifications</div>
+            ) : (
+              notifications.slice(0, 10).map((n) => (
+                <div
+                  key={n.id}
+                  onClick={() => {
+                    markAsRead(n.id);
+                    setNotifTrayOpen(false);
+                    if (n.linkUrl) navigate(n.linkUrl);
+                  }}
+                  className={`p-2 rounded-xl text-left flex items-start gap-2 ${
+                    !n.isRead ? 'bg-rose-50' : 'bg-slate-50'
+                  }`}
+                >
+                  <Bell className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-900">{n.title}</p>
+                    <p className="text-[11px] text-slate-600">{n.body}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-slate-100 px-4 pt-2 pb-6 space-y-3">
+          {!isInstalled && (
+            <div className="p-3 bg-gradient-to-r from-rose-50 to-violet-50 rounded-2xl border border-rose-200 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-900">Get Kunda Space App</p>
+                <p className="text-[10px] text-slate-500">Install to phone for tray notifications</p>
+              </div>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  installApp();
+                }}
+                className="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" /> Install
+              </button>
+            </div>
+          )}
+
           {!isAuthenticated ? (
             <div className="flex flex-col gap-2">
               <Link
@@ -280,6 +480,13 @@ export const Navbar: React.FC = () => {
                 className="py-2 px-3 text-sm font-medium text-slate-700 hover:bg-rose-50 rounded-lg"
               >
                 {t('nav.howItWorks')}
+              </Link>
+              <Link
+                to="/make-money"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2 px-3 text-sm font-bold text-amber-700 bg-amber-50 rounded-lg flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-amber-500" /> Earn Money
               </Link>
               <Link
                 to="/membership"
@@ -351,6 +558,13 @@ export const Navbar: React.FC = () => {
                 className="py-2 px-3 text-sm font-medium text-slate-700 hover:bg-rose-50 rounded-lg flex items-center gap-2"
               >
                 <Wallet className="w-4 h-4 text-emerald-600" /> {t('nav.wallet')} ({balance.toLocaleString()} RWF)
+              </Link>
+              <Link
+                to="/dashboard/referrals"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2 px-3 text-sm font-bold text-amber-800 bg-amber-50 rounded-lg flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-amber-500" /> Referrals & Earn Money
               </Link>
               <Link
                 to="/dashboard/profile"
