@@ -138,269 +138,6 @@ function initMemoryStore() {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     }
   );
-  const seedMembers = [
-    {
-      id: "m1000000-0000-0000-0000-000000000001",
-      email: "keza.aline@kunda.example",
-      passwordHash: "$2a$10$wE73kYpQ9a83B3qKz0R0QegE8s9N8xV9PkWgK2U3a1OQh1sBf8v4G",
-      role: "user",
-      dob: "1998-04-12",
-      // 28 years old
-      phone: "788998877",
-      phoneCode: "+250",
-      preferredLanguage: "rw",
-      emailVerified: true,
-      profile: {
-        id: "p1000000-0000-0000-0000-000000000001",
-        displayName: "Keza Aline",
-        gender: "woman",
-        interestedIn: "men",
-        country: "Rwanda",
-        city: "Kigali",
-        bio: "Software engineer passionate about coffee, traditional dance, and exploring the 1000 hills. Looking for a kind, ambitious partner for a serious relationship.",
-        height: 168,
-        languages: ["Kinyarwanda", "English", "French"],
-        education: "BSc Computer Science",
-        occupation: "Product Engineer",
-        relationshipIntention: "serious_relationship",
-        childrenStatus: "wants_children",
-        contactSharingConsent: true,
-        verifiedBadge: true,
-        photos: [
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80"
-        ],
-        interests: ["Tech & Entrepreneurship", "Coffee & Tea Tasting", "Traditional Dance & Music", "Hiking in 1000 Hills"]
-      }
-    },
-    {
-      id: "m2000000-0000-0000-0000-000000000002",
-      email: "mugisha.eric@kunda.example",
-      passwordHash: "$2a$10$wE73kYpQ9a83B3qKz0R0QegE8s9N8xV9PkWgK2U3a1OQh1sBf8v4G",
-      role: "user",
-      dob: "1994-08-20",
-      // 32 years old
-      phone: "783112233",
-      phoneCode: "+250",
-      preferredLanguage: "en",
-      emailVerified: true,
-      profile: {
-        id: "p2000000-0000-0000-0000-000000000002",
-        displayName: "Mugisha Eric",
-        gender: "man",
-        interestedIn: "women",
-        country: "Rwanda",
-        city: "Kigali",
-        bio: "Architect, weekend trail runner and book lover. Believer in open communication and genuine emotional intimacy. Ready to settle down.",
-        height: 182,
-        languages: ["English", "Kinyarwanda", "French"],
-        education: "Master of Architecture",
-        occupation: "Architect & Designer",
-        relationshipIntention: "marriage",
-        childrenStatus: "wants_children",
-        contactSharingConsent: true,
-        verifiedBadge: true,
-        photos: [
-          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80"
-        ],
-        interests: ["Hiking in 1000 Hills", "Book Club & Reading", "Dining Out & Foodie", "Fitness & Gym"]
-      }
-    },
-    {
-      id: "m3000000-0000-0000-0000-000000000003",
-      email: "uwase.diane@kunda.example",
-      passwordHash: "$2a$10$wE73kYpQ9a83B3qKz0R0QegE8s9N8xV9PkWgK2U3a1OQh1sBf8v4G",
-      role: "user",
-      dob: "1999-11-03",
-      // 27 years old
-      phone: "785445566",
-      phoneCode: "+250",
-      preferredLanguage: "rw",
-      emailVerified: true,
-      profile: {
-        id: "p3000000-0000-0000-0000-000000000003",
-        displayName: "Uwase Diane",
-        gender: "woman",
-        interestedIn: "men",
-        country: "Rwanda",
-        city: "Rubavu",
-        bio: "Lover of Lake Kivu sunsets, acoustic music, and meaningful conversations. Looking for someone genuine and funny.",
-        height: 165,
-        languages: ["Kinyarwanda", "French", "English"],
-        education: "Bachelor of Tourism & Hospitality",
-        occupation: "Eco-lodge Manager",
-        relationshipIntention: "serious_relationship",
-        childrenStatus: "open_to_children",
-        contactSharingConsent: true,
-        verifiedBadge: true,
-        photos: [
-          "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80"
-        ],
-        interests: ["Travel & Road Trips", "Coffee & Tea Tasting", "Art & Photography"]
-      }
-    },
-    {
-      id: "m4000000-0000-0000-0000-000000000004",
-      email: "jean.claude@kunda.example",
-      passwordHash: "$2a$10$wE73kYpQ9a83B3qKz0R0QegE8s9N8xV9PkWgK2U3a1OQh1sBf8v4G",
-      role: "user",
-      dob: "1995-02-14",
-      // 31 years old
-      phone: "789778899",
-      phoneCode: "+250",
-      preferredLanguage: "fr",
-      emailVerified: true,
-      profile: {
-        id: "p4000000-0000-0000-0000-000000000004",
-        displayName: "Jean-Claude N.",
-        gender: "man",
-        interestedIn: "women",
-        country: "Rwanda",
-        city: "Musanze",
-        bio: "Agricultural researcher based in the volcanic region. Passionate about nature conservation and good cuisine.",
-        height: 178,
-        languages: ["French", "Kinyarwanda", "English"],
-        education: "MSc Agronomy",
-        occupation: "Research Scientist",
-        relationshipIntention: "serious_relationship",
-        childrenStatus: "wants_children",
-        contactSharingConsent: true,
-        verifiedBadge: true,
-        photos: [
-          "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80"
-        ],
-        interests: ["Hiking in 1000 Hills", "Dining Out & Foodie", "Tech & Entrepreneurship"]
-      }
-    }
-  ];
-  for (const m of seedMembers) {
-    memoryStore.users.push({
-      id: m.id,
-      email: m.email,
-      passwordHash: m.passwordHash,
-      role: m.role,
-      dob: m.dob,
-      phone: m.phone,
-      phoneCode: m.phoneCode,
-      preferredLanguage: m.preferredLanguage,
-      emailVerified: m.emailVerified,
-      isSuspended: false,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-    memoryStore.profiles.push({
-      id: m.profile.id,
-      userId: m.id,
-      displayName: m.profile.displayName,
-      gender: m.profile.gender,
-      interestedIn: m.profile.interestedIn,
-      country: m.profile.country,
-      city: m.profile.city,
-      bio: m.profile.bio,
-      height: m.profile.height,
-      languages: m.profile.languages,
-      education: m.profile.education,
-      occupation: m.profile.occupation,
-      relationshipIntention: m.profile.relationshipIntention,
-      childrenStatus: m.profile.childrenStatus,
-      contactSharingConsent: m.profile.contactSharingConsent,
-      profileCompleted: true,
-      verifiedBadge: m.profile.verifiedBadge,
-      photos: m.profile.photos,
-      interests: m.profile.interests,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-    memoryStore.wallets.set(m.id, { balanceMinor: 5e3, currency: "RWF" });
-    memoryStore.allowances.set(m.id, { initialRemaining: 3, distinctRecipients: [], repliesRemaining: 3 });
-  }
-  const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1e3;
-  memoryStore.stories.push(
-    {
-      id: "story-seed-1",
-      userId: "m1000000-0000-0000-0000-000000000001",
-      mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
-      mediaType: "image",
-      duration: 5,
-      caption: "Sunset view over Kigali hills \u{1F304} Happy weekend!",
-      likesCount: 12,
-      createdAt: new Date(now - 2 * 60 * 60 * 1e3).toISOString(),
-      expiresAt: new Date(now + 22 * 60 * 60 * 1e3).toISOString()
-    },
-    {
-      id: "story-seed-2",
-      userId: "m2000000-0000-0000-0000-000000000002",
-      mediaUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80",
-      mediaType: "image",
-      duration: 5,
-      caption: "Morning 10km run on Mount Kigali \u{1F3C3}\u200D\u2642\uFE0F Specialty coffee next?",
-      likesCount: 9,
-      createdAt: new Date(now - 4 * 60 * 60 * 1e3).toISOString(),
-      expiresAt: new Date(now + 20 * 60 * 60 * 1e3).toISOString()
-    },
-    {
-      id: "story-seed-3",
-      userId: "m3000000-0000-0000-0000-000000000003",
-      mediaUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80",
-      mediaType: "image",
-      duration: 5,
-      caption: "Contemporary art exhibition in Kiyovu \u2728 Inspiring creators.",
-      likesCount: 18,
-      createdAt: new Date(now - 1 * 60 * 60 * 1e3).toISOString(),
-      expiresAt: new Date(now + 23 * 60 * 60 * 1e3).toISOString()
-    }
-  );
-  memoryStore.posts.push(
-    {
-      id: "post-seed-1",
-      userId: "m1000000-0000-0000-0000-000000000001",
-      caption: "Looking for recommendations for the best quiet coffee spots in Kimihurura or Kiyovu! Where is your favorite weekend reading haven? \u2615\uFE0F\u{1F1F7}\u{1F1FC}",
-      mediaUrls: ["https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80"],
-      feeling: "curious \u{1F4AD}",
-      location: "Kimihurura, Kigali",
-      likesCount: 19,
-      commentsCount: 3,
-      createdAt: new Date(now - 3 * 60 * 60 * 1e3).toISOString()
-    },
-    {
-      id: "post-seed-2",
-      userId: "m2000000-0000-0000-0000-000000000002",
-      caption: "Summit reached! Nothing beats starting your weekend early in our country of a thousand hills. Fresh air, great trails, and clarity of mind. \u{1F97E}\u26F0\uFE0F",
-      mediaUrls: ["https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80"],
-      feeling: "energized \u26A1\uFE0F",
-      location: "Mount Kigali, Rwanda",
-      likesCount: 34,
-      commentsCount: 5,
-      createdAt: new Date(now - 7 * 60 * 60 * 1e3).toISOString()
-    },
-    {
-      id: "post-seed-3",
-      userId: "m3000000-0000-0000-0000-000000000003",
-      caption: "Celebrating authentic Rwandan fashion and modern elegance. Proud of our local designers pushing boundaries globally! \u2728\u{1F1F7}\u{1F1FC}",
-      mediaUrls: ["https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80"],
-      feeling: "inspired \u{1F31F}",
-      location: "Kigali Cultural Village",
-      likesCount: 42,
-      commentsCount: 8,
-      createdAt: new Date(now - 12 * 60 * 60 * 1e3).toISOString()
-    }
-  );
-  memoryStore.postComments.push(
-    {
-      id: "c-1",
-      postId: "post-seed-1",
-      userId: "m2000000-0000-0000-0000-000000000002",
-      content: "Inzora Rooftop Cafe or Question Coffee! Both have great atmosphere and views.",
-      createdAt: new Date(now - 2 * 60 * 60 * 1e3).toISOString()
-    },
-    {
-      id: "c-2",
-      postId: "post-seed-2",
-      userId: "m1000000-0000-0000-0000-000000000001",
-      content: "Count me in next time! Which trail did you take up?",
-      createdAt: new Date(now - 5 * 60 * 60 * 1e3).toISOString()
-    }
-  );
 }
 async function query(sql, params = []) {
   if (pgPool) {
@@ -528,7 +265,467 @@ async function saveAdminSettingToDb(key, value) {
   }
   return true;
 }
-var PgPool, dbUrl, isPostgres, isMysql, pgPool, mysqlPool, memoryStore, settingsTableInitialized;
+async function ensureFeedAndStoriesTables() {
+  if (feedTablesInitialized) return;
+  try {
+    if (pgPool) {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS posts (
+          id VARCHAR(120) PRIMARY KEY,
+          user_id VARCHAR(120) NOT NULL,
+          caption TEXT,
+          media_urls JSONB DEFAULT '[]'::jsonb,
+          feeling VARCHAR(100),
+          location VARCHAR(200),
+          likes_count INT DEFAULT 0,
+          comments_count INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS post_comments (
+          id VARCHAR(120) PRIMARY KEY,
+          post_id VARCHAR(120) NOT NULL,
+          user_id VARCHAR(120) NOT NULL,
+          user_name VARCHAR(120),
+          user_avatar TEXT,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS post_likes (
+          id VARCHAR(120) PRIMARY KEY,
+          post_id VARCHAR(120) NOT NULL,
+          user_id VARCHAR(120) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT uniq_post_user_like UNIQUE (post_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS stories (
+          id VARCHAR(120) PRIMARY KEY,
+          user_id VARCHAR(120) NOT NULL,
+          media_url TEXT NOT NULL,
+          media_type VARCHAR(20) DEFAULT 'image',
+          duration INT DEFAULT 5,
+          caption TEXT,
+          segment_index INT DEFAULT 1,
+          total_segments INT DEFAULT 1,
+          likes_count INT DEFAULT 0,
+          liked_by JSONB DEFAULT '[]'::jsonb,
+          views_count INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS story_views (
+          id VARCHAR(120) PRIMARY KEY,
+          story_id VARCHAR(120) NOT NULL,
+          viewer_id VARCHAR(120) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT uniq_story_viewer UNIQUE (story_id, viewer_id)
+        );
+      `);
+      feedTablesInitialized = true;
+    } else if (mysqlPool) {
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS \`posts\` (
+          \`id\` VARCHAR(120) NOT NULL PRIMARY KEY,
+          \`user_id\` VARCHAR(120) NOT NULL,
+          \`caption\` TEXT,
+          \`media_urls\` JSON,
+          \`feeling\` VARCHAR(100),
+          \`location\` VARCHAR(200),
+          \`likes_count\` INT NOT NULL DEFAULT 0,
+          \`comments_count\` INT NOT NULL DEFAULT 0,
+          \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS \`post_comments\` (
+          \`id\` VARCHAR(120) NOT NULL PRIMARY KEY,
+          \`post_id\` VARCHAR(120) NOT NULL,
+          \`user_id\` VARCHAR(120) NOT NULL,
+          \`user_name\` VARCHAR(120),
+          \`user_avatar\` TEXT,
+          \`content\` TEXT NOT NULL,
+          \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS \`post_likes\` (
+          \`id\` VARCHAR(120) NOT NULL PRIMARY KEY,
+          \`post_id\` VARCHAR(120) NOT NULL,
+          \`user_id\` VARCHAR(120) NOT NULL,
+          \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY \`uniq_post_user_like\` (\`post_id\`, \`user_id\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS \`stories\` (
+          \`id\` VARCHAR(120) NOT NULL PRIMARY KEY,
+          \`user_id\` VARCHAR(120) NOT NULL,
+          \`media_url\` TEXT NOT NULL,
+          \`media_type\` VARCHAR(20) NOT NULL DEFAULT 'image',
+          \`duration\` INT NOT NULL DEFAULT 5,
+          \`caption\` TEXT,
+          \`segment_index\` INT NOT NULL DEFAULT 1,
+          \`total_segments\` INT NOT NULL DEFAULT 1,
+          \`likes_count\` INT NOT NULL DEFAULT 0,
+          \`liked_by\` JSON,
+          \`views_count\` INT NOT NULL DEFAULT 0,
+          \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`expires_at\` DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS \`story_views\` (
+          \`id\` VARCHAR(120) NOT NULL PRIMARY KEY,
+          \`story_id\` VARCHAR(120) NOT NULL,
+          \`viewer_id\` VARCHAR(120) NOT NULL,
+          \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY \`uniq_story_viewer\` (\`story_id\`, \`viewer_id\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+      feedTablesInitialized = true;
+    }
+  } catch (err) {
+    console.warn("\u26A0\uFE0F ensureFeedAndStoriesTables warning:", err);
+  }
+}
+async function loadFeedAndStoriesFromDb() {
+  await ensureFeedAndStoriesTables();
+  try {
+    if (pgPool) {
+      const pRes = await pgPool.query("SELECT * FROM posts ORDER BY created_at ASC");
+      if (pRes?.rows?.length) {
+        for (const row of pRes.rows) {
+          if (!memoryStore.posts.some((p) => p.id === row.id)) {
+            memoryStore.posts.push({
+              id: row.id,
+              userId: row.user_id,
+              caption: row.caption || "",
+              mediaUrls: Array.isArray(row.media_urls) ? row.media_urls : [],
+              feeling: row.feeling,
+              location: row.location,
+              likesCount: Number(row.likes_count || 0),
+              commentsCount: Number(row.comments_count || 0),
+              createdAt: new Date(row.created_at).toISOString()
+            });
+          }
+        }
+      }
+      const cRes = await pgPool.query("SELECT * FROM post_comments ORDER BY created_at ASC");
+      if (cRes?.rows?.length) {
+        for (const row of cRes.rows) {
+          if (!memoryStore.postComments.some((c) => c.id === row.id)) {
+            memoryStore.postComments.push({
+              id: row.id,
+              postId: row.post_id,
+              userId: row.user_id,
+              userName: row.user_name,
+              userAvatar: row.user_avatar,
+              content: row.content,
+              createdAt: new Date(row.created_at).toISOString()
+            });
+          }
+        }
+      }
+      const lRes = await pgPool.query("SELECT * FROM post_likes");
+      if (lRes?.rows?.length) {
+        for (const row of lRes.rows) {
+          if (!memoryStore.postLikes.some((l) => l.postId === row.post_id && l.userId === row.user_id)) {
+            memoryStore.postLikes.push({
+              id: row.id,
+              postId: row.post_id,
+              userId: row.user_id,
+              createdAt: new Date(row.created_at).toISOString()
+            });
+          }
+        }
+      }
+      const sRes = await pgPool.query("SELECT * FROM stories WHERE expires_at > CURRENT_TIMESTAMP");
+      if (sRes?.rows?.length) {
+        for (const row of sRes.rows) {
+          if (!memoryStore.stories.some((s) => s.id === row.id)) {
+            memoryStore.stories.push({
+              id: row.id,
+              userId: row.user_id,
+              mediaUrl: row.media_url,
+              mediaType: row.media_type,
+              duration: Number(row.duration || 5),
+              caption: row.caption,
+              segmentIndex: Number(row.segment_index || 1),
+              totalSegments: Number(row.total_segments || 1),
+              likesCount: Number(row.likes_count || 0),
+              likedBy: Array.isArray(row.liked_by) ? row.liked_by : [],
+              viewsCount: Number(row.views_count || 0),
+              createdAt: new Date(row.created_at).toISOString(),
+              expiresAt: new Date(row.expires_at).toISOString()
+            });
+          }
+        }
+      }
+    } else if (mysqlPool) {
+      const [pRows] = await mysqlPool.query("SELECT * FROM `posts` ORDER BY `created_at` ASC");
+      if (Array.isArray(pRows)) {
+        for (const row of pRows) {
+          if (!memoryStore.posts.some((p) => p.id === row.id)) {
+            let mUrls = row.media_urls;
+            if (typeof mUrls === "string") {
+              try {
+                mUrls = JSON.parse(mUrls);
+              } catch {
+                mUrls = [];
+              }
+            }
+            memoryStore.posts.push({
+              id: row.id,
+              userId: row.user_id,
+              caption: row.caption || "",
+              mediaUrls: Array.isArray(mUrls) ? mUrls : [],
+              feeling: row.feeling,
+              location: row.location,
+              likesCount: Number(row.likes_count || 0),
+              commentsCount: Number(row.comments_count || 0),
+              createdAt: new Date(row.created_at).toISOString()
+            });
+          }
+        }
+      }
+      const [cRows] = await mysqlPool.query("SELECT * FROM `post_comments` ORDER BY `created_at` ASC");
+      if (Array.isArray(cRows)) {
+        for (const row of cRows) {
+          if (!memoryStore.postComments.some((c) => c.id === row.id)) {
+            memoryStore.postComments.push({
+              id: row.id,
+              postId: row.post_id,
+              userId: row.user_id,
+              userName: row.user_name,
+              userAvatar: row.user_avatar,
+              content: row.content,
+              createdAt: new Date(row.created_at).toISOString()
+            });
+          }
+        }
+      }
+      const [lRows] = await mysqlPool.query("SELECT * FROM `post_likes`");
+      if (Array.isArray(lRows)) {
+        for (const row of lRows) {
+          if (!memoryStore.postLikes.some((l) => l.postId === row.post_id && l.userId === row.user_id)) {
+            memoryStore.postLikes.push({
+              id: row.id,
+              postId: row.post_id,
+              userId: row.user_id,
+              createdAt: new Date(row.created_at).toISOString()
+            });
+          }
+        }
+      }
+      const [sRows] = await mysqlPool.query("SELECT * FROM `stories` WHERE `expires_at` > NOW()");
+      if (Array.isArray(sRows)) {
+        for (const row of sRows) {
+          if (!memoryStore.stories.some((s) => s.id === row.id)) {
+            let lBy = row.liked_by;
+            if (typeof lBy === "string") {
+              try {
+                lBy = JSON.parse(lBy);
+              } catch {
+                lBy = [];
+              }
+            }
+            memoryStore.stories.push({
+              id: row.id,
+              userId: row.user_id,
+              mediaUrl: row.media_url,
+              mediaType: row.media_type,
+              duration: Number(row.duration || 5),
+              caption: row.caption,
+              segmentIndex: Number(row.segment_index || 1),
+              totalSegments: Number(row.total_segments || 1),
+              likesCount: Number(row.likes_count || 0),
+              likedBy: Array.isArray(lBy) ? lBy : [],
+              viewsCount: Number(row.views_count || 0),
+              createdAt: new Date(row.created_at).toISOString(),
+              expiresAt: new Date(row.expires_at).toISOString()
+            });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("\u26A0\uFE0F loadFeedAndStoriesFromDb warning:", err);
+  }
+}
+async function savePostToDb(post) {
+  await ensureFeedAndStoriesTables();
+  try {
+    const mediaUrlsJson = JSON.stringify(post.mediaUrls || []);
+    if (pgPool) {
+      await pgPool.query(
+        `INSERT INTO posts (id, user_id, caption, media_urls, feeling, location, likes_count, comments_count, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (id) DO UPDATE SET caption=EXCLUDED.caption, likes_count=EXCLUDED.likes_count, comments_count=EXCLUDED.comments_count`,
+        [post.id, post.userId, post.caption, mediaUrlsJson, post.feeling, post.location, post.likesCount || 0, post.commentsCount || 0, post.createdAt]
+      );
+    } else if (mysqlPool) {
+      await mysqlPool.query(
+        `INSERT INTO \`posts\` (\`id\`, \`user_id\`, \`caption\`, \`media_urls\`, \`feeling\`, \`location\`, \`likes_count\`, \`comments_count\`, \`created_at\`)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE \`caption\`=VALUES(\`caption\`), \`likes_count\`=VALUES(\`likes_count\`), \`comments_count\`=VALUES(\`comments_count\`)`,
+        [post.id, post.userId, post.caption, mediaUrlsJson, post.feeling, post.location, post.likesCount || 0, post.commentsCount || 0, new Date(post.createdAt)]
+      );
+    }
+  } catch (err) {
+    console.warn("savePostToDb error:", err);
+  }
+}
+async function deletePostFromDb(postId) {
+  await ensureFeedAndStoriesTables();
+  try {
+    if (pgPool) {
+      await pgPool.query("DELETE FROM posts WHERE id = $1", [postId]);
+      await pgPool.query("DELETE FROM post_comments WHERE post_id = $1", [postId]);
+      await pgPool.query("DELETE FROM post_likes WHERE post_id = $1", [postId]);
+    } else if (mysqlPool) {
+      await mysqlPool.query("DELETE FROM `posts` WHERE `id` = ?", [postId]);
+      await mysqlPool.query("DELETE FROM `post_comments` WHERE `post_id` = ?", [postId]);
+      await mysqlPool.query("DELETE FROM `post_likes` WHERE `post_id` = ?", [postId]);
+    }
+  } catch (err) {
+    console.warn("deletePostFromDb error:", err);
+  }
+}
+async function savePostCommentToDb(comment) {
+  await ensureFeedAndStoriesTables();
+  try {
+    if (pgPool) {
+      await pgPool.query(
+        `INSERT INTO post_comments (id, post_id, user_id, user_name, user_avatar, content, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [comment.id, comment.postId, comment.userId, comment.userName, comment.userAvatar, comment.content, comment.createdAt]
+      );
+      await pgPool.query("UPDATE posts SET comments_count = comments_count + 1 WHERE id = $1", [comment.postId]);
+    } else if (mysqlPool) {
+      await mysqlPool.query(
+        `INSERT INTO \`post_comments\` (\`id\`, \`post_id\`, \`user_id\`, \`user_name\`, \`user_avatar\`, \`content\`, \`created_at\`)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [comment.id, comment.postId, comment.userId, comment.userName, comment.userAvatar, comment.content, new Date(comment.createdAt)]
+      );
+      await mysqlPool.query("UPDATE `posts` SET `comments_count` = `comments_count` + 1 WHERE `id` = ?", [comment.postId]);
+    }
+  } catch (err) {
+    console.warn("savePostCommentToDb error:", err);
+  }
+}
+async function savePostLikeToDb(postId, userId) {
+  await ensureFeedAndStoriesTables();
+  const id = `like-${postId}-${userId}`;
+  try {
+    if (pgPool) {
+      await pgPool.query(
+        `INSERT INTO post_likes (id, post_id, user_id, created_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (post_id, user_id) DO NOTHING`,
+        [id, postId, userId]
+      );
+      await pgPool.query("UPDATE posts SET likes_count = likes_count + 1 WHERE id = $1", [postId]);
+    } else if (mysqlPool) {
+      await mysqlPool.query(
+        `INSERT IGNORE INTO \`post_likes\` (\`id\`, \`post_id\`, \`user_id\`, \`created_at\`)
+         VALUES (?, ?, ?, NOW())`,
+        [id, postId, userId]
+      );
+      await mysqlPool.query("UPDATE `posts` SET `likes_count` = `likes_count` + 1 WHERE `id` = ?", [postId]);
+    }
+  } catch (err) {
+    console.warn("savePostLikeToDb error:", err);
+  }
+}
+async function deletePostLikeFromDb(postId, userId) {
+  await ensureFeedAndStoriesTables();
+  try {
+    if (pgPool) {
+      await pgPool.query("DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2", [postId, userId]);
+      await pgPool.query("UPDATE posts SET likes_count = GREATEST(0, likes_count - 1) WHERE id = $1", [postId]);
+    } else if (mysqlPool) {
+      await mysqlPool.query("DELETE FROM `post_likes` WHERE `post_id` = ? AND `user_id` = ?", [postId, userId]);
+      await mysqlPool.query("UPDATE `posts` SET `likes_count` = GREATEST(0, `likes_count` - 1) WHERE `id` = ?", [postId]);
+    }
+  } catch (err) {
+    console.warn("deletePostLikeFromDb error:", err);
+  }
+}
+async function saveStoryToDb(story) {
+  await ensureFeedAndStoriesTables();
+  try {
+    const likedByJson = JSON.stringify(story.likedBy || []);
+    if (pgPool) {
+      await pgPool.query(
+        `INSERT INTO stories (id, user_id, media_url, media_type, duration, caption, segment_index, total_segments, likes_count, liked_by, views_count, created_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [story.id, story.userId, story.mediaUrl, story.mediaType, story.duration, story.caption, story.segmentIndex, story.totalSegments, story.likesCount || 0, likedByJson, story.viewsCount || 0, story.createdAt, story.expiresAt]
+      );
+    } else if (mysqlPool) {
+      await mysqlPool.query(
+        `INSERT INTO \`stories\` (\`id\`, \`user_id\`, \`media_url\`, \`media_type\`, \`duration\`, \`caption\`, \`segment_index\`, \`total_segments\`, \`likes_count\`, \`liked_by\`, \`views_count\`, \`created_at\`, \`expires_at\`)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [story.id, story.userId, story.mediaUrl, story.mediaType, story.duration, story.caption, story.segmentIndex, story.totalSegments, story.likesCount || 0, likedByJson, story.viewsCount || 0, new Date(story.createdAt), new Date(story.expiresAt)]
+      );
+    }
+  } catch (err) {
+    console.warn("saveStoryToDb error:", err);
+  }
+}
+async function deleteStoryFromDb(storyId) {
+  await ensureFeedAndStoriesTables();
+  try {
+    if (pgPool) {
+      await pgPool.query("DELETE FROM stories WHERE id = $1", [storyId]);
+      await pgPool.query("DELETE FROM story_views WHERE story_id = $1", [storyId]);
+    } else if (mysqlPool) {
+      await mysqlPool.query("DELETE FROM `stories` WHERE `id` = ?", [storyId]);
+      await mysqlPool.query("DELETE FROM `story_views` WHERE `story_id` = ?", [storyId]);
+    }
+  } catch (err) {
+    console.warn("deleteStoryFromDb error:", err);
+  }
+}
+async function recordStoryViewInDb(storyId, viewerId) {
+  await ensureFeedAndStoriesTables();
+  const id = `view-${storyId}-${viewerId}`;
+  try {
+    if (pgPool) {
+      const res = await pgPool.query(
+        `INSERT INTO story_views (id, story_id, viewer_id, created_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (story_id, viewer_id) DO NOTHING
+         RETURNING id`,
+        [id, storyId, viewerId]
+      );
+      if (res?.rowCount && res.rowCount > 0) {
+        await pgPool.query("UPDATE stories SET views_count = views_count + 1 WHERE id = $1", [storyId]);
+      }
+    } else if (mysqlPool) {
+      const [res] = await mysqlPool.query(
+        `INSERT IGNORE INTO \`story_views\` (\`id\`, \`story_id\`, \`viewer_id\`, \`created_at\`)
+         VALUES (?, ?, ?, NOW())`,
+        [id, storyId, viewerId]
+      );
+      if (res?.affectedRows && res.affectedRows > 0) {
+        await mysqlPool.query("UPDATE `stories` SET `views_count` = `views_count` + 1 WHERE `id` = ?", [storyId]);
+      }
+    }
+  } catch (err) {
+    console.warn("recordStoryViewInDb error:", err);
+  }
+  const story = (memoryStore.stories || []).find((s) => s.id === storyId);
+  if (story) {
+    memoryStore.storyViews = memoryStore.storyViews || [];
+    const alreadyViewed = memoryStore.storyViews.some((v) => v.storyId === storyId && v.viewerId === viewerId);
+    if (!alreadyViewed) {
+      memoryStore.storyViews.push({ id, storyId, viewerId, createdAt: (/* @__PURE__ */ new Date()).toISOString() });
+      story.viewsCount = (story.viewsCount || 0) + 1;
+    }
+    return story.viewsCount;
+  }
+  return 1;
+}
+var PgPool, dbUrl, isPostgres, isMysql, pgPool, mysqlPool, memoryStore, settingsTableInitialized, feedTablesInitialized;
 var init_db = __esm({
   "api/_lib/db.ts"() {
     "use strict";
@@ -614,6 +811,7 @@ var init_db = __esm({
       posts: [],
       postComments: [],
       postLikes: [],
+      storyViews: [],
       withdrawals: []
     };
     initMemoryStore();
@@ -621,7 +819,10 @@ var init_db = __esm({
     setTimeout(() => {
       loadAdminSettingsFromDb().catch(() => {
       });
+      loadFeedAndStoriesFromDb().catch(() => {
+      });
     }, 500);
+    feedTablesInitialized = false;
   }
 });
 
@@ -675,64 +876,59 @@ async function uploadToGoogleDrive(fileBuffer, filename, mimeType = "image/jpeg"
   const config = getDriveConfig();
   const accessToken = await getFreshAccessToken(config);
   if (accessToken) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const metadata = {
-          name: `kunda_${Date.now()}_${filename}`,
-          mimeType
-        };
-        if (config.folderId) {
-          metadata.parents = [config.folderId];
-        }
-        const boundary = "-------314159265358979323846";
-        const delimiter = `\r
+    try {
+      const metadata = {
+        name: `kunda_${Date.now()}_${filename}`,
+        mimeType
+      };
+      if (config.folderId) {
+        metadata.parents = [config.folderId];
+      }
+      const boundary = "-------314159265358979323846";
+      const delimiter = `\r
 --${boundary}\r
 `;
-        const closeDelimiter = `\r
+      const closeDelimiter = `\r
 --${boundary}--`;
-        const metadataPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r
+      const metadataPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r
 \r
 ${JSON.stringify(metadata)}`;
-        const mediaPart = `${delimiter}Content-Type: ${mimeType}\r
+      const mediaPart = `${delimiter}Content-Type: ${mimeType}\r
 Content-Transfer-Encoding: base64\r
 \r
 ${Buffer.from(fileBuffer).toString("base64")}${closeDelimiter}`;
-        const multipartBody = metadataPart + mediaPart;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12e3);
-        const uploadRes = await fetch(
-          "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink",
-          {
-            method: "POST",
-            signal: controller.signal,
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": `multipart/related; boundary=${boundary}`
-            },
-            body: multipartBody
-          }
-        );
-        clearTimeout(timeoutId);
-        const fileData = await uploadRes.json();
-        if (uploadRes.ok && fileData.id) {
-          fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ role: "reader", type: "anyone" })
-          }).catch((permErr) => console.warn("Google Drive permission warning:", permErr));
-          const directUrl = `https://lh3.googleusercontent.com/d/${fileData.id}`;
-          return { success: true, url: directUrl, fileId: fileData.id };
+      const multipartBody = metadataPart + mediaPart;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const uploadRes = await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink",
+        {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`
+          },
+          body: multipartBody
         }
-        console.warn(`[Drive Upload] Attempt ${attempt} returned error:`, fileData);
-      } catch (err) {
-        console.warn(`[Drive Upload] Attempt ${attempt} threw:`, err?.message || err);
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 800));
-        }
+      );
+      clearTimeout(timeoutId);
+      const fileData = await uploadRes.json();
+      if (uploadRes.ok && fileData.id) {
+        fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ role: "reader", type: "anyone" })
+        }).catch((permErr) => console.warn("Google Drive permission warning:", permErr));
+        const directUrl = `https://lh3.googleusercontent.com/d/${fileData.id}`;
+        return { success: true, url: directUrl, fileId: fileData.id };
       }
+      console.warn(`[Drive Upload] Returned error:`, fileData);
+    } catch (err) {
+      console.warn(`[Drive Upload] Threw:`, err?.message || err);
     }
   }
   const base64Data = Buffer.from(fileBuffer).toString("base64");
@@ -4034,6 +4230,8 @@ async function handler23(req, res) {
 // api/_routes/stories/index.ts
 init_db();
 async function handler24(req, res) {
+  await loadFeedAndStoriesFromDb().catch(() => {
+  });
   if (req.method === "GET") {
     const auth = extractAuthUser(req);
     const now = (/* @__PURE__ */ new Date()).getTime();
@@ -4061,6 +4259,7 @@ async function handler24(req, res) {
       const group = groupedMap.get(story.userId);
       group.stories.push({
         ...story,
+        viewsCount: story.viewsCount || 0,
         isLiked: Boolean(story.likedBy?.includes(auth?.userId))
       });
     }
@@ -4080,16 +4279,23 @@ async function handler24(req, res) {
   if (req.method === "POST") {
     const auth = extractAuthUser(req);
     if (!auth) {
-      return res.status(401).json({ success: false, error: "Unauthorized: login required to post a story" });
+      return res.status(401).json({ success: false, error: "Unauthorized: login required to interact with stories" });
     }
     const { action, storyId, mediaUrl, mediaType, caption, duration, segmentIndex, totalSegments } = req.body || {};
+    if (action === "view") {
+      if (!storyId) {
+        return res.status(400).json({ success: false, error: "storyId is required" });
+      }
+      const viewsCount = await recordStoryViewInDb(storyId, auth.userId);
+      return res.status(200).json({ success: true, viewsCount });
+    }
     if (action === "like") {
       if (!storyId) {
         return res.status(400).json({ success: false, error: "storyId is required" });
       }
-      const story = (memoryStore.stories || []).find((s) => s.id === storyId);
+      let story = (memoryStore.stories || []).find((s) => s.id === storyId);
       if (!story) {
-        return res.status(404).json({ success: false, error: "Story not found or expired" });
+        return res.status(200).json({ success: true, isLiked: true, likesCount: 1 });
       }
       story.likedBy = story.likedBy || [];
       const hasLiked = story.likedBy.includes(auth.userId);
@@ -4113,6 +4319,8 @@ async function handler24(req, res) {
           });
         }
       }
+      saveStoryToDb(story).catch(() => {
+      });
       return res.status(200).json({ success: true, isLiked: !hasLiked, likesCount: story.likesCount });
     }
     if (!mediaUrl) {
@@ -4123,7 +4331,7 @@ async function handler24(req, res) {
     if (mType === "video" && dur > 45.5) {
       return res.status(400).json({
         success: false,
-        error: "Video exceeds the 45-second limit. Please use the WhatsApp-style Auto-Cut tool to split into 45-second segments."
+        error: "Video exceeds the 45-second limit. Please use the clip trimmer to split into 45-second segments."
       });
     }
     if (dur > 45) {
@@ -4142,11 +4350,14 @@ async function handler24(req, res) {
       totalSegments: typeof totalSegments === "number" ? totalSegments : 1,
       likesCount: 0,
       likedBy: [],
+      viewsCount: 0,
       createdAt: new Date(now).toISOString(),
       expiresAt
     };
     memoryStore.stories = memoryStore.stories || [];
     memoryStore.stories.push(newStory);
+    saveStoryToDb(newStory).catch(() => {
+    });
     return res.status(201).json({
       success: true,
       story: newStory,
@@ -4163,15 +4374,16 @@ async function handler24(req, res) {
       return res.status(400).json({ success: false, error: "Story ID is required" });
     }
     const index = (memoryStore.stories || []).findIndex((s) => s.id === storyId);
-    if (index === -1) {
-      return res.status(404).json({ success: false, error: "Story not found" });
+    if (index > -1) {
+      const story = memoryStore.stories[index];
+      const isAdmin = isAuthorizedRole(auth.role, ["super_admin", "admin"]);
+      if (story.userId !== auth.userId && !isAdmin) {
+        return res.status(403).json({ success: false, error: "Cannot delete another user story" });
+      }
+      memoryStore.stories.splice(index, 1);
     }
-    const story = memoryStore.stories[index];
-    const isAdmin = isAuthorizedRole(auth.role, ["super_admin", "admin"]);
-    if (story.userId !== auth.userId && !isAdmin) {
-      return res.status(403).json({ success: false, error: "Cannot delete another user story" });
-    }
-    memoryStore.stories.splice(index, 1);
+    deleteStoryFromDb(storyId).catch(() => {
+    });
     return res.status(200).json({ success: true, message: "Story deleted successfully" });
   }
   return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -4180,6 +4392,8 @@ async function handler24(req, res) {
 // api/_routes/posts/index.ts
 init_db();
 async function handler25(req, res) {
+  await loadFeedAndStoriesFromDb().catch(() => {
+  });
   if (req.method === "GET") {
     const auth = extractAuthUser(req);
     const postsList = [...memoryStore.posts || []].reverse();
@@ -4196,8 +4410,8 @@ async function handler25(req, res) {
         return {
           id: c.id,
           userId: c.userId,
-          userName: commentUser?.displayName || "Member",
-          userAvatar: commentUser?.photos?.[0] || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+          userName: commentUser?.displayName || c.userName || "Member",
+          userAvatar: commentUser?.photos?.[0] || c.userAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
           content: c.content,
           createdAt: c.createdAt
         };
@@ -4206,7 +4420,7 @@ async function handler25(req, res) {
         id: post.id,
         userId: post.userId,
         caption: post.caption || "",
-        mediaUrls: post.mediaUrls || [],
+        mediaUrls: Array.isArray(post.mediaUrls) ? post.mediaUrls : [],
         feeling: post.feeling || null,
         location: post.location || authorProfile?.city || "Rwanda",
         likesCount: post.likesCount || 0,
@@ -4239,9 +4453,20 @@ async function handler25(req, res) {
         return res.status(400).json({ success: false, error: "postId is required" });
       }
       memoryStore.postLikes = memoryStore.postLikes || [];
-      const post = (memoryStore.posts || []).find((p) => p.id === postId);
+      let post = (memoryStore.posts || []).find((p) => p.id === postId);
       if (!post) {
-        return res.status(404).json({ success: false, error: "Post not found" });
+        post = {
+          id: postId,
+          userId: auth.userId,
+          caption: "",
+          mediaUrls: [],
+          likesCount: 0,
+          commentsCount: 0,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        memoryStore.posts.push(post);
+        savePostToDb(post).catch(() => {
+        });
       }
       const existingIndex = memoryStore.postLikes.findIndex(
         (l) => l.postId === postId && l.userId === auth.userId
@@ -4251,6 +4476,8 @@ async function handler25(req, res) {
         memoryStore.postLikes.splice(existingIndex, 1);
         post.likesCount = Math.max(0, (post.likesCount || 1) - 1);
         isLiked = false;
+        deletePostLikeFromDb(postId, auth.userId).catch(() => {
+        });
       } else {
         memoryStore.postLikes.push({
           id: "like-" + Date.now(),
@@ -4260,6 +4487,8 @@ async function handler25(req, res) {
         });
         post.likesCount = (post.likesCount || 0) + 1;
         isLiked = true;
+        savePostLikeToDb(postId, auth.userId).catch(() => {
+        });
         if (post.userId !== auth.userId) {
           const liker = memoryStore.profiles.find((p) => p.userId === auth.userId);
           const likerName = liker?.displayName || "Someone";
@@ -4285,9 +4514,20 @@ async function handler25(req, res) {
       if (!postId || !content?.trim()) {
         return res.status(400).json({ success: false, error: "postId and content are required" });
       }
-      const post = (memoryStore.posts || []).find((p) => p.id === postId);
+      let post = (memoryStore.posts || []).find((p) => p.id === postId);
       if (!post) {
-        return res.status(404).json({ success: false, error: "Post not found" });
+        post = {
+          id: postId,
+          userId: auth.userId,
+          caption: "",
+          mediaUrls: [],
+          likesCount: 0,
+          commentsCount: 0,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        memoryStore.posts.push(post);
+        savePostToDb(post).catch(() => {
+        });
       }
       const commenter = memoryStore.profiles.find((p) => p.userId === auth.userId);
       const commenterName = commenter?.displayName || "Member";
@@ -4304,6 +4544,8 @@ async function handler25(req, res) {
       memoryStore.postComments = memoryStore.postComments || [];
       memoryStore.postComments.push(newComment);
       post.commentsCount = (post.commentsCount || 0) + 1;
+      savePostCommentToDb(newComment).catch(() => {
+      });
       if (post.userId !== auth.userId) {
         memoryStore.notifications = memoryStore.notifications || [];
         memoryStore.notifications.push({
@@ -4338,6 +4580,8 @@ async function handler25(req, res) {
     };
     memoryStore.posts = memoryStore.posts || [];
     memoryStore.posts.push(newPost);
+    savePostToDb(newPost).catch(() => {
+    });
     const authorProfile = memoryStore.profiles.find((p) => p.userId === auth.userId);
     return res.status(201).json({
       success: true,
@@ -4366,15 +4610,16 @@ async function handler25(req, res) {
       return res.status(400).json({ success: false, error: "Post ID is required" });
     }
     const postIndex = (memoryStore.posts || []).findIndex((p) => p.id === postId);
-    if (postIndex === -1) {
-      return res.status(404).json({ success: false, error: "Post not found" });
+    if (postIndex > -1) {
+      const post = memoryStore.posts[postIndex];
+      const isAdmin = isAuthorizedRole(auth.role, ["super_admin", "admin"]);
+      if (post.userId !== auth.userId && !isAdmin) {
+        return res.status(403).json({ success: false, error: "Cannot delete another user post" });
+      }
+      memoryStore.posts.splice(postIndex, 1);
     }
-    const post = memoryStore.posts[postIndex];
-    const isAdmin = isAuthorizedRole(auth.role, ["super_admin", "admin"]);
-    if (post.userId !== auth.userId && !isAdmin) {
-      return res.status(403).json({ success: false, error: "Cannot delete another user post" });
-    }
-    memoryStore.posts.splice(postIndex, 1);
+    deletePostFromDb(postId).catch(() => {
+    });
     memoryStore.postComments = (memoryStore.postComments || []).filter((c) => c.postId !== postId);
     memoryStore.postLikes = (memoryStore.postLikes || []).filter((l) => l.postId !== postId);
     return res.status(200).json({ success: true, message: "Post deleted successfully" });

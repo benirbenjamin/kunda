@@ -77,68 +77,63 @@ export async function uploadToGoogleDrive(
   const config = getDriveConfig();
   const accessToken = await getFreshAccessToken(config);
 
-  // If Google Drive credentials are configured and valid, execute upload with retry
+  // If Google Drive credentials are configured and valid, execute upload with tight timeout
   if (accessToken) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const metadata: any = {
-          name: `kunda_${Date.now()}_${filename}`,
-          mimeType,
-        };
-        if (config.folderId) {
-          metadata.parents = [config.folderId];
-        }
-
-        const boundary = '-------314159265358979323846';
-        const delimiter = `\r\n--${boundary}\r\n`;
-        const closeDelimiter = `\r\n--${boundary}--`;
-
-        const metadataPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}`;
-        const mediaPart = `${delimiter}Content-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.from(fileBuffer).toString('base64')}${closeDelimiter}`;
-
-        const multipartBody = metadataPart + mediaPart;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-        const uploadRes = await fetch(
-          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink',
-          {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': `multipart/related; boundary=${boundary}`,
-            },
-            body: multipartBody,
-          }
-        );
-        clearTimeout(timeoutId);
-
-        const fileData = await uploadRes.json();
-        if (uploadRes.ok && fileData.id) {
-          // Make file publicly viewable in background
-          fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ role: 'reader', type: 'anyone' }),
-          }).catch((permErr) => console.warn('Google Drive permission warning:', permErr));
-
-          // Direct CDN embed link
-          const directUrl = `https://lh3.googleusercontent.com/d/${fileData.id}`;
-          return { success: true, url: directUrl, fileId: fileData.id };
-        }
-
-        console.warn(`[Drive Upload] Attempt ${attempt} returned error:`, fileData);
-      } catch (err: any) {
-        console.warn(`[Drive Upload] Attempt ${attempt} threw:`, err?.message || err);
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 800));
-        }
+    try {
+      const metadata: any = {
+        name: `kunda_${Date.now()}_${filename}`,
+        mimeType,
+      };
+      if (config.folderId) {
+        metadata.parents = [config.folderId];
       }
+
+      const boundary = '-------314159265358979323846';
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const closeDelimiter = `\r\n--${boundary}--`;
+
+      const metadataPart = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}`;
+      const mediaPart = `${delimiter}Content-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.from(fileBuffer).toString('base64')}${closeDelimiter}`;
+
+      const multipartBody = metadataPart + mediaPart;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const uploadRes = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink',
+        {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+          },
+          body: multipartBody,
+        }
+      );
+      clearTimeout(timeoutId);
+
+      const fileData = await uploadRes.json();
+      if (uploadRes.ok && fileData.id) {
+        // Make file publicly viewable in background
+        fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+        }).catch((permErr) => console.warn('Google Drive permission warning:', permErr));
+
+        // Direct CDN embed link
+        const directUrl = `https://lh3.googleusercontent.com/d/${fileData.id}`;
+        return { success: true, url: directUrl, fileId: fileData.id };
+      }
+
+      console.warn(`[Drive Upload] Returned error:`, fileData);
+    } catch (err: any) {
+      console.warn(`[Drive Upload] Threw:`, err?.message || err);
     }
   }
 

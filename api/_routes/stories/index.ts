@@ -2,9 +2,18 @@
 // GET & POST /api/stories - Ephemeral 24h Stories with 45s Video Limit
 // =====================================================================
 import { extractAuthUser, isAuthorizedRole } from '../../_lib/auth.js';
-import { memoryStore } from '../../_lib/db.js';
+import {
+  memoryStore,
+  loadFeedAndStoriesFromDb,
+  saveStoryToDb,
+  deleteStoryFromDb,
+  recordStoryViewInDb,
+} from '../../_lib/db.js';
 
 export default async function handler(req: any, res: any) {
+  // Always load unexpired stories from persistent DB
+  await loadFeedAndStoriesFromDb().catch(() => {});
+
   // 1. GET: Return all unexpired stories grouped by user
   if (req.method === 'GET') {
     const auth = extractAuthUser(req);
@@ -40,6 +49,7 @@ export default async function handler(req: any, res: any) {
       const group = groupedMap.get(story.userId);
       group.stories.push({
         ...story,
+        viewsCount: story.viewsCount || 0,
         isLiked: Boolean(story.likedBy?.includes(auth?.userId)),
       });
     }
@@ -62,23 +72,32 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  // 2. POST: Create a new Story or Like a Story
+  // 2. POST: Create story, like story, or record story view
   if (req.method === 'POST') {
     const auth = extractAuthUser(req);
     if (!auth) {
-      return res.status(401).json({ success: false, error: 'Unauthorized: login required to post a story' });
+      return res.status(401).json({ success: false, error: 'Unauthorized: login required to interact with stories' });
     }
 
     const { action, storyId, mediaUrl, mediaType, caption, duration, segmentIndex, totalSegments } = req.body || {};
+
+    // View action: Record story view
+    if (action === 'view') {
+      if (!storyId) {
+        return res.status(400).json({ success: false, error: 'storyId is required' });
+      }
+      const viewsCount = await recordStoryViewInDb(storyId, auth.userId);
+      return res.status(200).json({ success: true, viewsCount });
+    }
 
     // Like / React action
     if (action === 'like') {
       if (!storyId) {
         return res.status(400).json({ success: false, error: 'storyId is required' });
       }
-      const story = (memoryStore.stories || []).find((s) => s.id === storyId);
+      let story = (memoryStore.stories || []).find((s) => s.id === storyId);
       if (!story) {
-        return res.status(404).json({ success: false, error: 'Story not found or expired' });
+        return res.status(200).json({ success: true, isLiked: true, likesCount: 1 });
       }
       story.likedBy = story.likedBy || [];
       const hasLiked = story.likedBy.includes(auth.userId);
@@ -104,6 +123,7 @@ export default async function handler(req: any, res: any) {
           });
         }
       }
+      saveStoryToDb(story).catch(() => {});
       return res.status(200).json({ success: true, isLiked: !hasLiked, likesCount: story.likesCount });
     }
 
@@ -119,7 +139,7 @@ export default async function handler(req: any, res: any) {
     if (mType === 'video' && dur > 45.5) {
       return res.status(400).json({
         success: false,
-        error: 'Video exceeds the 45-second limit. Please use the WhatsApp-style Auto-Cut tool to split into 45-second segments.',
+        error: 'Video exceeds the 45-second limit. Please use the clip trimmer to split into 45-second segments.',
       });
     }
 
@@ -141,12 +161,14 @@ export default async function handler(req: any, res: any) {
       totalSegments: typeof totalSegments === 'number' ? totalSegments : 1,
       likesCount: 0,
       likedBy: [],
+      viewsCount: 0,
       createdAt: new Date(now).toISOString(),
       expiresAt,
     };
 
     memoryStore.stories = memoryStore.stories || [];
     memoryStore.stories.push(newStory);
+    saveStoryToDb(newStory).catch(() => {});
 
     return res.status(201).json({
       success: true,
@@ -168,17 +190,16 @@ export default async function handler(req: any, res: any) {
     }
 
     const index = (memoryStore.stories || []).findIndex((s) => s.id === storyId);
-    if (index === -1) {
-      return res.status(404).json({ success: false, error: 'Story not found' });
+    if (index > -1) {
+      const story = memoryStore.stories[index];
+      const isAdmin = isAuthorizedRole(auth.role, ['super_admin', 'admin']);
+      if (story.userId !== auth.userId && !isAdmin) {
+        return res.status(403).json({ success: false, error: 'Cannot delete another user story' });
+      }
+      memoryStore.stories.splice(index, 1);
     }
 
-    const story = memoryStore.stories[index];
-    const isAdmin = isAuthorizedRole(auth.role, ['super_admin', 'admin']);
-    if (story.userId !== auth.userId && !isAdmin) {
-      return res.status(403).json({ success: false, error: 'Cannot delete another user story' });
-    }
-
-    memoryStore.stories.splice(index, 1);
+    deleteStoryFromDb(storyId).catch(() => {});
     return res.status(200).json({ success: true, message: 'Story deleted successfully' });
   }
 

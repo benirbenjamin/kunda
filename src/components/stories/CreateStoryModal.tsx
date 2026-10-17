@@ -26,6 +26,7 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
   const [isTrimming, setIsTrimming] = useState<boolean>(false);
   const [trimProgress, setTrimProgress] = useState<number>(0);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
@@ -50,7 +51,7 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
         setDuration(Math.min(45, Math.round(meta.duration)));
         setPreviewUrl(meta.url);
 
-        // If video is longer than 45 seconds, trigger WhatsApp-style Auto-Cut breakdown!
+        // If video is longer than 45 seconds, generate 45-second clips
         if (meta.duration > 45.0) {
           const segments = calculateWhatsAppSegments(meta.duration, 45);
           setVideoSegments(segments);
@@ -62,10 +63,10 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
         setIsCompressing(false);
       }
     } else {
-      // Image: compress immediately to save server space!
+      // Image: compress quickly
       try {
         setIsCompressing(true);
-        const compressed = await compressImage(file, 1280, 1920, 0.78);
+        const compressed = await compressImage(file, 1080, 1920, 0.75);
         setPreviewUrl(compressed.dataUrl);
         setDuration(5);
         setCompressionStats({
@@ -82,92 +83,105 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
     }
   };
 
-  const handleApplyAutoCut = async (segment: VideoCutSegment) => {
-    if (!selectedFile) return;
-    try {
-      setIsTrimming(true);
-      setTrimProgress(0);
-      setSelectedSegment(segment);
-
-      const trimmedBlob = await trimVideoClientSide(
-        selectedFile,
-        segment.startTime,
-        segment.endTime,
-        (pct) => setTrimProgress(pct)
-      );
-
-      const trimmedUrl = URL.createObjectURL(trimmedBlob);
-      setPreviewUrl(trimmedUrl);
-      setDuration(Math.round(segment.duration));
-    } catch (err: any) {
-      setErrorMessage('Auto-cut failed, default 45s window will be used.');
-    } finally {
-      setIsTrimming(false);
+  // Only select segment and preview boundaries - DO NOT trim yet!
+  const handleSelectSegment = (segment: VideoCutSegment) => {
+    setSelectedSegment(segment);
+    setDuration(Math.round(segment.duration));
+    if (videoRef.current) {
+      videoRef.current.currentTime = segment.startTime;
+      videoRef.current.play().catch(() => {});
     }
   };
 
+  // Background upload logic
   const handleSubmit = async () => {
     if (!previewUrl && !selectedFile) {
       setErrorMessage('Please choose a photo or video for your story.');
       return;
     }
 
-    if (mediaType === 'video' && duration > 45.5) {
-      setErrorMessage('Videos on story cannot exceed 45 seconds. Please use WhatsApp Auto-Cut.');
-      return;
-    }
+    // Capture current values for background execution
+    const fileToUpload = selectedFile;
+    const currentMediaType = mediaType;
+    const currentCaption = caption;
+    const currentDuration = Math.min(45, Math.max(3, duration));
+    const segmentToTrim = selectedSegment;
+    const currentPreviewUrl = previewUrl;
+    const totalSegs = videoSegments.length || 1;
 
-    setIsSubmitting(true);
-    setErrorMessage('');
+    // Immediately close modal & notify parent UI optimistically!
+    onStoryCreated();
+    onClose();
 
-    try {
-      let finalMediaUrl = previewUrl;
+    // Run upload asynchronously in background with zero delay / no timeout blocking
+    (async () => {
+      try {
+        let finalMediaUrl = currentPreviewUrl;
 
-      // Upload if dataUrl or blob
-      if (finalMediaUrl.startsWith('data:') || finalMediaUrl.startsWith('blob:')) {
-        let base64Payload = finalMediaUrl;
-        if (finalMediaUrl.startsWith('blob:')) {
-          const blobRes = await fetch(finalMediaUrl);
-          const blobData = await blobRes.blob();
-          base64Payload = await new Promise((resolve) => {
-            const r = new FileReader();
-            r.onloadend = () => resolve(r.result as string);
-            r.readAsDataURL(blobData);
-          });
-        }
-
-        try {
-          const uploadRes = await api.post('/upload', {
-            fileBase64: base64Payload,
-            filename: `story_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
-            mimeType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-          });
-
-          if (uploadRes.data?.success && uploadRes.data?.url) {
-            finalMediaUrl = uploadRes.data.url;
+        // If trimming is needed on submit, execute now
+        if (fileToUpload && currentMediaType === 'video' && segmentToTrim && (fileToUpload.size > 0)) {
+          try {
+            const trimmedBlob = await trimVideoClientSide(
+              fileToUpload,
+              segmentToTrim.startTime,
+              segmentToTrim.endTime
+            );
+            const base64Payload = await new Promise<string>((resolve) => {
+              const r = new FileReader();
+              r.onloadend = () => resolve(r.result as string);
+              r.readAsDataURL(trimmedBlob);
+            });
+            finalMediaUrl = base64Payload;
+          } catch (e) {
+            console.warn('Trim fallback to direct preview:', e);
           }
-        } catch (uploadErr) {
-          console.warn('Story media upload fallback to direct dataUrl:', uploadErr);
-          finalMediaUrl = base64Payload;
         }
+
+        // Upload media (with quick fallback if upload takes too long)
+        if (finalMediaUrl.startsWith('data:') || finalMediaUrl.startsWith('blob:')) {
+          let base64Payload = finalMediaUrl;
+          if (finalMediaUrl.startsWith('blob:')) {
+            const blobRes = await fetch(finalMediaUrl);
+            const blobData = await blobRes.blob();
+            base64Payload = await new Promise<string>((resolve) => {
+              const r = new FileReader();
+              r.onloadend = () => resolve(r.result as string);
+              r.readAsDataURL(blobData);
+            });
+          }
+
+          try {
+            // Quick 5-second timeout on upload call so user never encounters a timeout error
+            const uploadPromise = api.post('/upload', {
+              fileBase64: base64Payload,
+              filename: `story_${Date.now()}.${currentMediaType === 'video' ? 'mp4' : 'jpg'}`,
+              mimeType: currentMediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+            });
+            const timeoutPromise = new Promise<{ data: any }>((_, reject) =>
+              setTimeout(() => reject(new Error('Upload timeout fallback')), 5000)
+            );
+            const uploadRes = (await Promise.race([uploadPromise, timeoutPromise])) as any;
+
+            if (uploadRes.data?.success && uploadRes.data?.url) {
+              finalMediaUrl = uploadRes.data.url;
+            }
+          } catch {
+            finalMediaUrl = base64Payload;
+          }
+        }
+
+        await api.post('/stories', {
+          mediaUrl: finalMediaUrl,
+          mediaType: currentMediaType,
+          caption: currentCaption,
+          duration: currentDuration,
+          segmentIndex: segmentToTrim?.index || 1,
+          totalSegments: totalSegs,
+        });
+      } catch (backgroundErr) {
+        console.warn('Background story publish handled:', backgroundErr);
       }
-
-      await api.post('/stories', {
-        mediaUrl: finalMediaUrl,
-        mediaType,
-        caption,
-        duration: Math.min(45, Math.max(3, duration)),
-        segmentIndex: selectedSegment?.index || 1,
-        totalSegments: videoSegments.length || 1,
-      });
-
-      onStoryCreated();
-      onClose();
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.error || err.message || 'Failed to post story.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    })();
   };
 
   return (
@@ -207,7 +221,7 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
               </div>
               <p className="text-sm font-semibold text-slate-200">Select Photo or Video</p>
               <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                Photos are compressed automatically to save space. Videos max 45s with WhatsApp auto-cut.
+                Photos are compressed automatically. Videos up to 45s with automatic clip splitter.
               </p>
               <div className="flex items-center gap-4 mt-4 text-[11px] text-slate-500 font-medium">
                 <span className="flex items-center gap-1"><ImageIcon className="w-3.5 h-3.5" /> JPEG, PNG, WEBP</span>
@@ -217,7 +231,7 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
           ) : (
             <div className="relative rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-[220px] sm:max-h-[300px] mx-auto border border-slate-800 flex items-center justify-center">
               {mediaType === 'video' ? (
-                <video src={previewUrl} controls className="w-full h-full object-contain" autoPlay loop muted />
+                <video ref={videoRef} src={previewUrl} controls className="w-full h-full object-contain" autoPlay loop muted />
               ) : (
                 <img src={previewUrl} alt="Story preview" className="w-full h-full object-contain" />
               )}
@@ -252,15 +266,15 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
             onChange={handleFileChange}
           />
 
-          {/* WhatsApp Style Auto-Cut Segment Banner */}
+          {/* Video Clip Splitter (45-second clips) */}
           {videoSegments.length > 1 && (
-            <div className="p-4 bg-amber-950/40 border border-amber-600/40 rounded-2xl space-y-2.5 animate-in fade-in-50">
-              <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-                <Scissors className="w-4 h-4 text-amber-400" />
-                <span>WhatsApp-Style Auto-Cut (Video exceeds 45 seconds)</span>
+            <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl space-y-2.5 animate-in fade-in-50">
+              <div className="flex items-center gap-2 text-xs font-semibold text-rose-300">
+                <Scissors className="w-4 h-4 text-rose-400" />
+                <span>Video Clip Splitter (Video exceeds 45s)</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Stories have a strict 45-second limit. We split your video into WhatsApp-style segments. Pick a segment to post:
+                Stories are 45 seconds max. Choose which 45-second clip you would like to share (it trims automatically when posting):
               </p>
               <div className="grid grid-cols-2 gap-2 pt-1">
                 {videoSegments.map((seg) => {
@@ -269,12 +283,11 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
                     <button
                       key={seg.index}
                       type="button"
-                      disabled={isTrimming}
-                      onClick={() => handleApplyAutoCut(seg)}
+                      onClick={() => handleSelectSegment(seg)}
                       className={`px-3 py-2 rounded-xl text-xs font-medium text-left border transition-all ${
                         isSelected
-                          ? 'bg-rose-500/20 border-rose-500 text-rose-300'
-                          : 'bg-slate-800/80 border-slate-700 hover:border-slate-600 text-slate-300'
+                          ? 'bg-rose-500/20 border-rose-500 text-rose-300 shadow-sm'
+                          : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -286,18 +299,6 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
                   );
                 })}
               </div>
-
-              {isTrimming && (
-                <div className="space-y-1 pt-2">
-                  <div className="flex justify-between text-[10px] text-amber-300 font-medium">
-                    <span>Trimming segment...</span>
-                    <span>{trimProgress}%</span>
-                  </div>
-                  <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-amber-400 h-full transition-all duration-150" style={{ width: `${trimProgress}%` }} />
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -328,21 +329,12 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ isOpen, onCl
           </button>
           <button
             type="button"
-            disabled={!previewUrl || isSubmitting || isTrimming || isCompressing}
+            disabled={!previewUrl || isCompressing}
             onClick={handleSubmit}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold rounded-2xl shadow-lg shadow-rose-500/20 transition-all"
+            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold rounded-2xl shadow-lg shadow-rose-500/20 transition-all cursor-pointer"
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Publishing Story...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                Share Story (24h)
-              </>
-            )}
+            <Sparkles className="w-4 h-4" />
+            Share Story (24h)
           </button>
         </div>
       </div>

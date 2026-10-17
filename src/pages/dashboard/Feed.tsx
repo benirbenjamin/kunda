@@ -74,12 +74,20 @@ export const Feed: React.FC = () => {
   const [spaceSavings, setSpaceSavings] = useState<{ original: string; compressed: string; savedPct: number } | null>(null);
   const [isSubmittingPost, setIsSubmittingPost] = useState<boolean>(false);
   const [postError, setPostError] = useState<string>('');
+  const [postAlsoOnStory, setPostAlsoOnStory] = useState<boolean>(false);
 
   // Comment section state
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const isVideoUrl = (url: string) =>
+    url.startsWith('data:video') ||
+    url.includes('.mp4') ||
+    url.includes('.webm') ||
+    url.includes('.mov') ||
+    url.includes('video/');
 
   const feelingsList = [
     'Feeling romantic ❤️',
@@ -120,7 +128,7 @@ export const Feed: React.FC = () => {
     fetchStories();
   }, []);
 
-  // Handle Photo selection with Space-Saving Canvas Compression
+  // Handle Photo and Video selection
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -136,77 +144,148 @@ export const Feed: React.FC = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         totalOrig += file.size;
-        const res = await compressImage(file, 1440, 1440, 0.78);
-        totalComp += res.compressedSize;
-        compressedList.push(res.dataUrl);
+
+        if (file.type.startsWith('video/')) {
+          // Read video as data URL
+          const videoDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          totalComp += file.size;
+          compressedList.push(videoDataUrl);
+        } else {
+          // Compress photo for space optimization
+          const res = await compressImage(file, 1440, 1440, 0.78);
+          totalComp += res.compressedSize;
+          compressedList.push(res.dataUrl);
+        }
       }
 
       setCompressedPhotos((prev) => [...prev, ...compressedList]);
 
       const saved = Math.max(0, totalOrig - totalComp);
       const savedPct = totalOrig > 0 ? Math.round((saved / totalOrig) * 100) : 0;
-      setSpaceSavings({
-        original: `${Math.round(totalOrig / 1024)} KB`,
-        compressed: `${Math.round(totalComp / 1024)} KB`,
-        savedPct,
-      });
+      if (savedPct > 0) {
+        setSpaceSavings({
+          original: `${Math.round(totalOrig / 1024)} KB`,
+          compressed: `${Math.round(totalComp / 1024)} KB`,
+          savedPct,
+        });
+      }
     } catch (err: any) {
-      setPostError('Error compressing photos for space optimization.');
+      setPostError('Error processing selected media files.');
     } finally {
       setIsCompressingPhotos(false);
     }
   };
 
-  // Submit Post
+  // Submit Post with background upload & no-hang execution
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCaption.trim() && compressedPhotos.length === 0) {
-      setPostError('Please write a caption or add a photo to post.');
+      setPostError('Please write a caption or add a photo/video to post.');
       return;
     }
 
-    setIsSubmittingPost(true);
     setPostError('');
 
-    try {
-      // Upload compressed images with safe fallback to dataUrl
-      const uploadedUrls: string[] = [];
-      for (let i = 0; i < compressedPhotos.length; i++) {
-        try {
-          const uploadRes = await api.post('/upload', {
-            fileBase64: compressedPhotos[i],
-            filename: `post_${Date.now()}_${i}.jpg`,
-            mimeType: 'image/jpeg',
-          });
-          if (uploadRes.data?.success && uploadRes.data?.url) {
-            uploadedUrls.push(uploadRes.data.url);
-          } else {
-            uploadedUrls.push(compressedPhotos[i]);
+    // Capture values for optimistic display and background upload
+    const captionToPost = newCaption.trim();
+    const mediaToPost = [...compressedPhotos];
+    const feelingToPost = selectedFeeling;
+    const locationToPost = postLocation;
+    const shareToStory = postAlsoOnStory;
+
+    // Optimistically create local post
+    const optimisticPost: PostItem = {
+      id: 'post-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
+      userId: user?.id || 'me',
+      caption: captionToPost,
+      mediaUrls: mediaToPost,
+      feeling: feelingToPost || undefined,
+      location: locationToPost || undefined,
+      likesCount: 0,
+      commentsCount: 0,
+      isLiked: false,
+      comments: [],
+      createdAt: new Date().toISOString(),
+      author: {
+        id: user?.id || 'me',
+        displayName: user?.email?.split('@')[0] || 'You',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        verifiedBadge: false,
+        city: locationToPost || 'Kigali',
+      },
+    };
+
+    setPosts((prev) => [optimisticPost, ...prev]);
+
+    // Reset inputs immediately so the user can continue freely!
+    setNewCaption('');
+    setSelectedFeeling('');
+    setCompressedPhotos([]);
+    setSpaceSavings(null);
+    setPostAlsoOnStory(false);
+
+    // Asynchronously perform background upload
+    (async () => {
+      try {
+        const uploadedUrls: string[] = [];
+        for (let i = 0; i < mediaToPost.length; i++) {
+          const item = mediaToPost[i];
+          const isVid = isVideoUrl(item);
+          try {
+            // Upload with race timeout so it never hangs
+            const uploadPromise = api.post('/upload', {
+              fileBase64: item,
+              filename: `post_${Date.now()}_${i}.${isVid ? 'mp4' : 'jpg'}`,
+              mimeType: isVid ? 'video/mp4' : 'image/jpeg',
+            });
+            const timeoutPromise = new Promise<{ data: any }>((_, reject) =>
+              setTimeout(() => reject(new Error('Upload timeout fallback')), 5000)
+            );
+            const uploadRes = (await Promise.race([uploadPromise, timeoutPromise])) as any;
+
+            if (uploadRes.data?.success && uploadRes.data?.url) {
+              uploadedUrls.push(uploadRes.data.url);
+            } else {
+              uploadedUrls.push(item);
+            }
+          } catch {
+            uploadedUrls.push(item);
           }
-        } catch {
-          uploadedUrls.push(compressedPhotos[i]);
         }
-      }
 
-      const postRes = await api.post('/posts', {
-        caption: newCaption,
-        mediaUrls: uploadedUrls,
-        feeling: selectedFeeling || null,
-        location: postLocation || null,
-      });
+        const postRes = await api.post('/posts', {
+          caption: captionToPost,
+          mediaUrls: uploadedUrls,
+          feeling: feelingToPost || null,
+          location: locationToPost || null,
+        });
 
-      if (postRes.data?.success && postRes.data?.post) {
-        setPosts((prev) => [postRes.data.post, ...prev]);
-        setNewCaption('');
-        setSelectedFeeling('');
-        setCompressedPhotos([]);
-        setSpaceSavings(null);
+        if (postRes.data?.success && postRes.data?.post) {
+          setPosts((prev) =>
+            prev.map((p) => (p.id === optimisticPost.id ? postRes.data.post : p))
+          );
+        }
+
+        // If also requested to share to 24h story
+        if (shareToStory && uploadedUrls.length > 0) {
+          const firstMedia = uploadedUrls[0];
+          await api.post('/stories', {
+            mediaUrl: firstMedia,
+            mediaType: isVideoUrl(firstMedia) ? 'video' : 'image',
+            caption: captionToPost.slice(0, 200),
+            duration: isVideoUrl(firstMedia) ? 15 : 5,
+          });
+          fetchStories();
+        }
+      } catch (err: any) {
+        console.warn('Background post share handled:', err);
       }
-    } catch (err: any) {
-      setPostError(err.response?.data?.error || err.message || 'Failed to share post.');
-    } finally {
-      setIsSubmittingPost(false);
-    }
+    })();
   };
 
   // Like / Unlike Post
@@ -348,13 +427,17 @@ export const Feed: React.FC = () => {
               </div>
             )}
 
-            {/* Compressed Photos Preview with Space-Savings indicator */}
+            {/* Compressed Media Preview with Space-Savings indicator */}
             {compressedPhotos.length > 0 && (
               <div className="space-y-2">
                 <div className="grid grid-cols-3 gap-2">
                   {compressedPhotos.map((url, i) => (
-                    <div key={i} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 group">
-                      <img src={url} alt={`Upload ${i}`} className="w-full h-full object-cover" />
+                    <div key={i} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 group">
+                      {isVideoUrl(url) ? (
+                        <video src={url} controls className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={url} alt={`Upload ${i}`} className="w-full h-full object-cover" />
+                      )}
                       <button
                         type="button"
                         onClick={() => setCompressedPhotos((prev) => prev.filter((_, idx) => idx !== i))}
@@ -370,7 +453,7 @@ export const Feed: React.FC = () => {
                   <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
                     <span className="flex items-center gap-1.5 font-medium">
                       <Sparkles className="w-4 h-4 text-emerald-600" />
-                      Optimized with Canvas Compression
+                      Optimized Media Compression
                     </span>
                     <span className="font-bold text-emerald-700">
                       Saved {spaceSavings.savedPct}% ({spaceSavings.original} → {spaceSavings.compressed})
@@ -387,7 +470,6 @@ export const Feed: React.FC = () => {
             )}
 
             {/* Bottom Actions of Create Post */}
-            {/* Bottom Actions of Create Post */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
@@ -397,7 +479,7 @@ export const Feed: React.FC = () => {
                   className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
                 >
                   <ImageIcon className="w-4 h-4 text-rose-500" />
-                  <span>{isCompressingPhotos ? 'Compressing...' : 'Add Photos'}</span>
+                  <span>{isCompressingPhotos ? 'Compressing...' : 'Add Photo / Video'}</span>
                 </button>
 
                 {/* Vibe / Feeling Picker */}
@@ -413,6 +495,17 @@ export const Feed: React.FC = () => {
                     </option>
                   ))}
                 </select>
+
+                {/* Also share to 24h story checkbox */}
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/60 hover:bg-slate-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={postAlsoOnStory}
+                    onChange={(e) => setPostAlsoOnStory(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-rose-600 rounded text-rose-600 cursor-pointer"
+                  />
+                  <span>Also share to Story (24h)</span>
+                </label>
               </div>
 
               <button
@@ -420,17 +513,8 @@ export const Feed: React.FC = () => {
                 disabled={isSubmittingPost || isCompressingPhotos}
                 className="flex items-center gap-1.5 px-4 sm:px-5 py-2 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-500/20 disabled:opacity-50 transition-all shrink-0 ml-auto"
               >
-                {isSubmittingPost ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Posting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" />
-                    Post
-                  </>
-                )}
+                <Send className="w-3.5 h-3.5" />
+                Post
               </button>
             </div>
           </form>
@@ -439,7 +523,7 @@ export const Feed: React.FC = () => {
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*"
+            accept="image/*,video/*"
             className="hidden"
             onChange={handlePhotoSelect}
           />
@@ -473,11 +557,17 @@ export const Feed: React.FC = () => {
                       <img
                         src={post.author.avatar}
                         alt={post.author.displayName}
-                        className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-100"
+                        className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-100 cursor-pointer"
+                        onClick={() => navigate(`/dashboard/messages?user=${post.author.id}&name=${encodeURIComponent(post.author.displayName)}&avatar=${encodeURIComponent(post.author.avatar)}`)}
                       />
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <h4 className="text-sm font-bold text-slate-900">{post.author.displayName}</h4>
+                          <h4
+                            onClick={() => navigate(`/dashboard/messages?user=${post.author.id}&name=${encodeURIComponent(post.author.displayName)}&avatar=${encodeURIComponent(post.author.avatar)}`)}
+                            className="text-sm font-bold text-slate-900 cursor-pointer hover:underline hover:text-rose-600"
+                          >
+                            {post.author.displayName}
+                          </h4>
                           {post.author.verifiedBadge && (
                             <CheckCircle className="w-3.5 h-3.5 text-rose-500 fill-rose-50" />
                           )}
@@ -520,14 +610,22 @@ export const Feed: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Post Media Gallery */}
+                  {/* Post Media Gallery: Supports both Images and Videos */}
                   {post.mediaUrls && post.mediaUrls.length > 0 && (
                     <div className="relative bg-slate-900 max-h-[500px] overflow-hidden flex items-center justify-center">
-                      <img
-                        src={post.mediaUrls[0]}
-                        alt="Post media"
-                        className="w-full object-contain max-h-[480px]"
-                      />
+                      {isVideoUrl(post.mediaUrls[0]) ? (
+                        <video
+                          src={post.mediaUrls[0]}
+                          controls
+                          className="w-full object-contain max-h-[480px]"
+                        />
+                      ) : (
+                        <img
+                          src={post.mediaUrls[0]}
+                          alt="Post media"
+                          className="w-full object-contain max-h-[480px]"
+                        />
+                      )}
                     </div>
                   )}
 
@@ -559,7 +657,7 @@ export const Feed: React.FC = () => {
                       {/* Direct Message button to author */}
                       {!isOwner && (
                         <button
-                          onClick={() => navigate('/dashboard/messages')}
+                          onClick={() => navigate(`/dashboard/messages?user=${post.author.id}&name=${encodeURIComponent(post.author.displayName)}&avatar=${encodeURIComponent(post.author.avatar)}`)}
                           className="flex items-center gap-1 px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-full transition-colors"
                         >
                           <Send className="w-3 h-3" />
@@ -581,10 +679,27 @@ export const Feed: React.FC = () => {
                                 <img
                                   src={comment.userAvatar}
                                   alt={comment.userName}
-                                  className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
+                                  className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5 cursor-pointer"
+                                  onClick={() => navigate(`/dashboard/messages?user=${comment.userId}&name=${encodeURIComponent(comment.userName)}&avatar=${encodeURIComponent(comment.userAvatar)}`)}
                                 />
                                 <div className="flex-1 bg-slate-50 p-2 rounded-2xl">
-                                  <span className="font-bold text-slate-800 mr-1.5">{comment.userName}</span>
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <span
+                                      onClick={() => navigate(`/dashboard/messages?user=${comment.userId}&name=${encodeURIComponent(comment.userName)}&avatar=${encodeURIComponent(comment.userAvatar)}`)}
+                                      className="font-bold text-slate-800 cursor-pointer hover:underline hover:text-rose-600"
+                                    >
+                                      {comment.userName}
+                                    </span>
+                                    {comment.userId !== user?.id && (
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate(`/dashboard/messages?user=${comment.userId}&name=${encodeURIComponent(comment.userName)}&avatar=${encodeURIComponent(comment.userAvatar)}`)}
+                                        className="text-[10px] text-rose-600 hover:text-rose-700 font-semibold ml-2"
+                                      >
+                                        Message
+                                      </button>
+                                    )}
+                                  </div>
                                   <span className="text-slate-700">{comment.content}</span>
                                 </div>
                               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, Send, Trash2, Clock, CheckCircle } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Heart, Send, Trash2, Clock, CheckCircle, Eye } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ export interface StoryItem {
   segmentIndex?: number;
   totalSegments?: number;
   likesCount: number;
+  viewsCount?: number;
   isLiked?: boolean;
   createdAt: string;
   expiresAt: string;
@@ -53,6 +54,7 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
   const [replySent, setReplySent] = useState<boolean>(false);
   const [isLiked, setIsLiked] = useState<boolean>(false);
   const [likesCount, setLikesCount] = useState<number>(0);
+  const [viewsCount, setViewsCount] = useState<number>(0);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const progressIntervalRef = useRef<any>(null);
@@ -71,9 +73,19 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
     if (!currentStory) return;
     setIsLiked(Boolean(currentStory.isLiked));
     setLikesCount(currentStory.likesCount || 0);
+    setViewsCount(currentStory.viewsCount || 0);
     setProgressPct(0);
     setReplyText('');
     setReplySent(false);
+
+    // Track story view in background
+    api.post('/stories', { action: 'view', storyId: currentStory.id })
+      .then((res) => {
+        if (res.data?.success && typeof res.data.viewsCount === 'number') {
+          setViewsCount(res.data.viewsCount);
+        }
+      })
+      .catch(() => {});
   }, [currentStory]);
 
   // Timer loop for progress bar
@@ -215,6 +227,10 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
                 <span className="flex items-center gap-0.5">
                   <Clock className="w-2.5 h-2.5" />
                   {formatHoursLeft(currentStory.expiresAt)}
+                </span>
+                <span className="flex items-center gap-1 bg-white/15 px-1.5 py-0.5 rounded-full text-[9px] text-white/90">
+                  <Eye className="w-2.5 h-2.5 text-rose-300" />
+                  {viewsCount} {viewsCount === 1 ? 'view' : 'views'}
                 </span>
                 {currentStory.totalSegments && currentStory.totalSegments > 1 && (
                   <span className="bg-white/20 px-1.5 py-0.2 rounded-full text-[9px]">
